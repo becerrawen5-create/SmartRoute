@@ -63,10 +63,10 @@ fun HistoryScreen(vm: SmartRouteViewModel) {
             val km = vm.history.sumOf { it.km }
             val avg = if (total > 0) vm.history.sumOf { it.minutes } / total else 0
             val top = RecommendationEngine.mostFrequentRoute(vm.history)
-            StatCard("Recorriddsfos", "$total")
+            StatCard("Recorridos", "$total")
             StatCard("Distancia total", "${"%.1f".format(km)} km")
             StatCard("Duración promedio", "$avg min")
-            StatCard("Rutadfs más frecuente", top?.let { "${it.first} (${it.second}x)" } ?: "—")
+            StatCard("Ruta más frecuente", top?.let { "${it.first} (${it.second}x)" } ?: "—")
             StatCard("Adaptaciones aceptadas", "${vm.acceptedAdaptations}")
         } else {
             val list = vm.history.filter { filter == 0 || it.title in favoriteTitles }
