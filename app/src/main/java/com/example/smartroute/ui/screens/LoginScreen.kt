@@ -28,7 +28,7 @@ import com.example.smartroute.ui.components.StatusBarStyle
 import com.example.smartroute.ui.theme.*
 
 @Composable
-fun LoginScreen(vm: SmartRouteViewModel, onLoggedIn: () -> Unit) {
+fun LoginScreen(vm: SmartRouteViewModel, onLoggedIn: () -> Unit, onNavigateToRegister: () -> Unit) {
     StatusBarStyle(darkIcons = true)
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
@@ -89,8 +89,17 @@ fun LoginScreen(vm: SmartRouteViewModel, onLoggedIn: () -> Unit) {
         }
         Button(
             onClick = {
-                if (vm.login(email, password)) onLoggedIn()
-                else error = "Ingresa tu correo y contraseña."
+                if(email.isBlank() || password.isBlank()){
+                    error = "Rellena los campos por favor"
+                }else{
+                    vm.login(email, password){ exito ->
+                        if (exito){
+                            onLoggedIn()
+                        }else{
+                            error = "El correo no esta registrado en la base de datos"
+                        }
+                    }
+                }
             },
             modifier = Modifier.fillMaxWidth().height(50.dp),
             shape = RoundedCornerShape(12.dp)
@@ -108,6 +117,8 @@ fun LoginScreen(vm: SmartRouteViewModel, onLoggedIn: () -> Unit) {
             }
         }
         Spacer(Modifier.height(24.dp))
-        Text("¿No tienes una cuenta? Regístrate", color = Muted, fontSize = 13.sp, textAlign = TextAlign.Center)
+        TextButton(onClick = onNavigateToRegister) {
+            Text("¿No tienes una cuenta? Registrate", color = Blue900, fontSize = 13.sp, textAlign = TextAlign.Center)
+        }
     }
 }

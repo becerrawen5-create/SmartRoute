@@ -1,5 +1,6 @@
 package com.example.smartroute
 
+import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
@@ -9,10 +10,13 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import com.example.smartroute.ai.RecommendationEngine
 import com.example.smartroute.data.*
+import com.google.firebase.Firebase
+import com.google.firebase.firestore.firestore
+import org.mindrot.jbcrypt.BCrypt
 import kotlin.math.roundToInt
 
 class SmartRouteViewModel : ViewModel() {
-
+    private final val db = Firebase.firestore
     var userName by mutableStateOf("Ana López")
     var email by mutableStateOf("ana.lopez@gmail.com")
 
@@ -34,9 +38,70 @@ class SmartRouteViewModel : ViewModel() {
     val featuredRoute: RouteItem
         get() = routes.firstOrNull { it.favorite } ?: routes.first()
 
-    /** Demo: acepta cualquier correo y contraseña no vacíos. */
-    fun login(email: String, password: String): Boolean =
-        email.isNotBlank() && password.isNotBlank()
+    fun registerUser(
+        nombre: String,
+        apellidoPaterno: String,
+        apellidoMaterno: String,
+        emailInput: String,
+        passInput: String,
+        onResult: (Boolean) -> Unit
+    ) {
+       val hashPassword= BCrypt.hashpw(passInput, BCrypt.gensalt())
+        val nuevoUsuario = hashMapOf(
+            "Nombre(s)" to nombre,
+            "Apellido paterno" to apellidoPaterno,
+            "Apellido materno" to apellidoMaterno,
+            "email" to emailInput,
+            "password" to hashPassword
+        )
+
+        db.collection("users")
+            .add(nuevoUsuario)
+            .addOnSuccessListener { documentReference ->
+                Log.d("RegisterDebug", "Usuario registrado con ID: ${documentReference.id}")
+                userName = nombre
+                email = emailInput
+                onResult(true)
+            }
+            .addOnFailureListener { e ->
+                Log.w("RegisterDebug", "Error al registrar usuario", e)
+                onResult(false)
+            }
+    }
+    /** Metodo para el logearse ya conectado a la base de datos */
+    fun login(emailInput: String, passwordInput: String, onResult: (Boolean) -> Unit) {
+        if (emailInput.isBlank() || passwordInput.isBlank()) {
+            onResult(false)
+            return
+        }
+        Log.d("LoginDebug", "Buscando - Email: '${emailInput.trim()}'")
+        db.collection("users")
+            .whereEqualTo("email", emailInput.trim())
+            .get()
+            .addOnSuccessListener { documents ->
+                if (!documents.isEmpty) {
+                    val document = documents.documents[0]
+                    val storeHash = document.getString("password") ?: ""
+                    if(BCrypt.checkpw(passwordInput, storeHash)){
+                        userName = document.getString("Nombre(s)")?:"Usuario"
+                        email = document.getString("email")?: emailInput
+                        Log.d("LoginDebug", "¡Inicio de sesión exitoso con contraseña encriptada!")
+                        onResult(true)
+                    }else{
+                        // La contraseña no coincide con el hash
+                        Log.d("LoginDebug", "Contraseña incorrecta.")
+                        onResult(false)
+                    }
+                } else {
+                    Log.d("LoginDebug", "Correo o contraseña incorrectos en la BD.")
+                    onResult(false)
+                }
+            }
+            .addOnFailureListener { exception ->
+                Log.w("LoginDebug", "Error al conectar con Firestore", exception)
+                onResult(false)
+            }
+    }
 
     fun select(id: Int) {
         selectedRouteId = id

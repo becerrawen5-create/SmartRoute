@@ -29,6 +29,7 @@ import com.example.smartroute.ui.screens.*
 object Dest {
     const val SPLASH = "splash"
     const val LOGIN = "login"
+    const val REGISTER = "register"
     const val HOME = "home"
     const val MAP = "map"
     const val DETAIL = "detail"
@@ -88,9 +89,30 @@ fun SmartRouteApp(vm: SmartRouteViewModel = viewModel()) {
                 SplashScreen(onStart = { nav.navigate(Dest.LOGIN) })
             }
             composable(Dest.LOGIN) {
-                LoginScreen(vm, onLoggedIn = {
-                    nav.navigate(Dest.HOME) { popUpTo(Dest.SPLASH) { inclusive = true } }
-                })
+                LoginScreen(
+                    vm = vm,
+                    onLoggedIn = {
+                        nav.navigate(Dest.HOME) {
+                            popUpTo(Dest.LOGIN) { inclusive = true }
+                        }
+                    },
+                    onNavigateToRegister = {
+                        nav.navigate(Dest.REGISTER)
+                    }
+                )
+            }
+            composable(Dest.REGISTER) {
+                RegisterScreen(
+                    vm = vm,
+                    onRegistered = {
+                        nav.navigate(Dest.HOME) {
+                            popUpTo(Dest.LOGIN) { inclusive = true }
+                        }
+                    },
+                    onBackToLogin = {
+                        nav.popBackStack()
+                    }
+                )
             }
             composable(Dest.HOME) {
                 HomeScreen(
