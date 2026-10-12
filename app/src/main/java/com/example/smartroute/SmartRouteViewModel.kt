@@ -102,7 +102,37 @@ class SmartRouteViewModel : ViewModel() {
                 onResult(false)
             }
     }
+    fun validatePasswordSecurity(password: String): String? {
+        if(password.length<10){
+            return "La contraseña debe tner al menos 10 caracteres"
+        }
+        val mayuscula =password.any{it.isUpperCase()}
+        val minuscula = password.any { it.isLowerCase() }
+        val numero = password.any { it.isDigit() }
+        val simbolo = password.any { it.isLetterOrDigit() }
 
+        if(!mayuscula) return "Debe tener al menos una letra mayuscula"
+        if(!minuscula) return "Debe tener al menos una letra minuscula"
+        if(!numero) return "Debe tener al menos un numero"
+        if (!simbolo) return "Debe tener al menos un simolo especial (ej. @, _, ?, #"
+
+        for( i in 0 until password.length-2){
+            val c1 = password[i]
+            val c2 = password[i+1]
+            val c3 = password[i+2]
+
+            if(c1.isDigit() && c2.isDigit() && c3.isDigit()){
+                val secuenciaAscendente = (c2-c1 == 1 && c3-c2 ==1)
+                val secuenciaDescendente = (c1-c2 == 1 && c2-c3 ==1)
+                val repetido = (c1==c2 && c2==c3)
+
+                if(secuenciaAscendente || secuenciaDescendente || repetido){
+                    return "No se permiten números consecutivos (ej. 123) ni repetidos (ej. 111)."
+                }
+            }
+        }
+        return null
+    }
     fun select(id: Int) {
         selectedRouteId = id
         learnedMessage = null
