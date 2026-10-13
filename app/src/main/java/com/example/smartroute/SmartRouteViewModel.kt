@@ -11,6 +11,8 @@ import androidx.lifecycle.ViewModel
 import com.example.smartroute.ai.RecommendationEngine
 import com.example.smartroute.data.*
 import com.google.firebase.Firebase
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.FirebaseAuthException
 import com.google.firebase.firestore.firestore
 import org.mindrot.jbcrypt.BCrypt
 import kotlin.math.roundToInt
@@ -37,16 +39,18 @@ class SmartRouteViewModel : ViewModel() {
 
     val featuredRoute: RouteItem
         get() = routes.firstOrNull { it.favorite } ?: routes.first()
-
-    fun registerUser(
+    //METODOS DEL LOGIN CON AUTENTICACION
+    //METODOS DE AUTENTICACION
+    val auth = FirebaseAuth.getInstance()
+    fun registerWithAuth(
         nombre: String,
         apellidoPaterno: String,
         apellidoMaterno: String,
         emailInput: String,
-        passInput: String,
-        onResult: (Boolean) -> Unit
+        passwordInput: String,
+        onResult: (Boolean, String?) -> Unit
     ) {
-       val hashPassword= BCrypt.hashpw(passInput, BCrypt.gensalt())
+        val hashPassword = BCrypt.hashpw(passwordInput, BCrypt.gensalt())
         val nuevoUsuario = hashMapOf(
             "Nombre(s)" to nombre,
             "Apellido paterno" to apellidoPaterno,
@@ -55,53 +59,75 @@ class SmartRouteViewModel : ViewModel() {
             "password" to hashPassword
         )
 
-        db.collection("users")
-            .add(nuevoUsuario)
-            .addOnSuccessListener { documentReference ->
-                Log.d("RegisterDebug", "Usuario registrado con ID: ${documentReference.id}")
-                userName = nombre
-                email = emailInput
-                onResult(true)
+        auth.createUserWithEmailAndPassword(emailInput, passwordInput)
+            .addOnSuccessListener { authResult ->
+                val user = authResult.user
+
+                db.collection("users")
+                    .add(nuevoUsuario)
+                    .addOnSuccessListener { documentReference ->
+                        Log.d("RegisterDebug", "Usuario registrado en Firestore con ID: ${documentReference.id}")
+                        userName = nombre
+                        email = emailInput
+
+                        user?.sendEmailVerification()?.addOnCompleteListener { task ->
+                            if (task.isSuccessful) {
+                                onResult(true, null)
+                            } else {
+                                onResult(false, "Se creó el usuario pero falló el envío del correo")
+                            }
+                        }
+                    }
+                    .addOnFailureListener { e ->
+                        Log.w("RegisterDebug", "Error al registrar usuario en Firestore", e)
+                        onResult(false, "Error al guardar datos de usuario en la base de datos")
+                    }
             }
             .addOnFailureListener { e ->
-                Log.w("RegisterDebug", "Error al registrar usuario", e)
-                onResult(false)
+                onResult(false, e.localizedMessage)
             }
     }
-    /** Metodo para el logearse ya conectado a la base de datos */
-    fun login(emailInput: String, passwordInput: String, onResult: (Boolean) -> Unit) {
+
+    fun loginWithAuth(emailInput: String, passwordInput: String, onResult: (Boolean, String?) -> Unit) {
         if (emailInput.isBlank() || passwordInput.isBlank()) {
-            onResult(false)
+            onResult(false, "Por favor completa todos los campos")
             return
         }
-        Log.d("LoginDebug", "Buscando - Email: '${emailInput.trim()}'")
-        db.collection("users")
-            .whereEqualTo("email", emailInput.trim())
-            .get()
-            .addOnSuccessListener { documents ->
-                if (!documents.isEmpty) {
-                    val document = documents.documents[0]
-                    val storeHash = document.getString("password") ?: ""
-                    if(BCrypt.checkpw(passwordInput, storeHash)){
-                        userName = document.getString("Nombre(s)")?:"Usuario"
-                        email = document.getString("email")?: emailInput
-                        Log.d("LoginDebug", "¡Inicio de sesión exitoso con contraseña encriptada!")
-                        onResult(true)
-                    }else{
-                        // La contraseña no coincide con el hash
-                        Log.d("LoginDebug", "Contraseña incorrecta.")
-                        onResult(false)
-                    }
+
+        auth.signInWithEmailAndPassword(emailInput, passwordInput)
+            .addOnSuccessListener { authResult ->
+                val user = authResult.user
+                if (user != null && user.isEmailVerified) {
+                    Log.d("LoginDebug", "Buscando en Firestore - Email: '${emailInput.trim()}'")
+                    db.collection("users")
+                        .whereEqualTo("email", emailInput.trim())
+                        .get()
+                        .addOnSuccessListener { documents ->
+                            if (!documents.isEmpty) {
+                                val document = documents.documents[0]
+                                userName = document.getString("Nombre(s)") ?: "Usuario"
+                                email = document.getString("email") ?: emailInput
+                                Log.d("LoginDebug", "¡Inicio de sesión exitoso con Auth y datos cargados de Firestore!")
+                            } else {
+                                email = emailInput
+                            }
+                            onResult(true, null)
+                        }
+                        .addOnFailureListener { exception ->
+                            Log.w("LoginDebug", "Error al conectar con Firestore", exception)
+                            email = emailInput
+                            onResult(true, null)
+                        }
                 } else {
-                    Log.d("LoginDebug", "Correo o contraseña incorrectos en la BD.")
-                    onResult(false)
+                    auth.signOut()
+                    onResult(false, "Por favor verifica tu correo")
                 }
             }
-            .addOnFailureListener { exception ->
-                Log.w("LoginDebug", "Error al conectar con Firestore", exception)
-                onResult(false)
+            .addOnFailureListener { e ->
+                onResult(false, e.localizedMessage)
             }
     }
+    //METODO PARA VALIDACIONES DE CONTRASEÑA
     fun validatePasswordSecurity(password: String): String? {
         if(password.length<10){
             return "La contraseña debe tner al menos 10 caracteres"
@@ -133,6 +159,7 @@ class SmartRouteViewModel : ViewModel() {
         }
         return null
     }
+    //FIN DE LOS METODOS DEL LOGIN
     fun select(id: Int) {
         selectedRouteId = id
         learnedMessage = null

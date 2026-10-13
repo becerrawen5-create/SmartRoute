@@ -105,7 +105,7 @@ fun SmartRouteApp(vm: SmartRouteViewModel = viewModel()) {
                 RegisterScreen(
                     vm = vm,
                     onRegistered = {
-                        nav.navigate(Dest.HOME) {
+                        nav.navigate(Dest.LOGIN) {
                             popUpTo(Dest.LOGIN) { inclusive = true }
                         }
                     },

@@ -12,7 +12,12 @@
           "package_name": "com.example.smartroute"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "92582558324-u4ebkttb6pkt7isgd0bikj0ee4hpgntg.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyCSDGvEFXGY3v6X4BauTus-mForiByld6w"
@@ -20,7 +25,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "92582558324-u4ebkttb6pkt7isgd0bikj0ee4hpgntg.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

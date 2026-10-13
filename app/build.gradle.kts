@@ -35,7 +35,8 @@ android {
 }
 
 dependencies {
-    implementation("com.google.firebase:firebase-firestore:27.0.0")
+    implementation("com.google.firebase:firebase-auth:23.2.0")
+    implementation("com.google.firebase:firebase-firestore:25.1.2")
     val composeBom = platform("androidx.compose:compose-bom:2024.09.00")
     implementation(composeBom)
     implementation("org.mindrot:jbcrypt:0.4")

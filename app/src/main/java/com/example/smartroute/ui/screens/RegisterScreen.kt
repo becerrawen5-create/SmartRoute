@@ -153,22 +153,25 @@ fun RegisterScreen(
         }
         Button(
             onClick = {
-                if(nombre.isBlank() || apellidoPaterno.isBlank() || apellidoMaterno.isBlank() || email.isBlank()|| password.isBlank()){
-                    error="Por favor completa los campos obligatorios"
+                if (nombre.isBlank() || apellidoPaterno.isBlank() || apellidoMaterno.isBlank() || email.isBlank() || password.isBlank()) {
+                    error = "Por favor completa los campos obligatorios"
                     return@Button
                 }
+
                 val errorPassword = vm.validatePasswordSecurity(password)
-                if(errorPassword !=null){
+                if (errorPassword != null) {
                     error = errorPassword
                     return@Button
                 }
+
                 isLoading = true
-                vm.registerUser(nombre, apellidoPaterno, apellidoMaterno, email, password){
-                    exito-> isLoading=false
-                    if(exito){
+                vm.registerWithAuth(nombre, apellidoPaterno, apellidoMaterno, email, password) { exito, mensajeError ->
+                    isLoading = false
+                    if (exito) {
+                        error = "¡Registro exitoso! Revisa tu correo para verificar tu cuenta."
                         onRegistered()
-                    }else{
-                        error="Error al registrar el usuario"
+                    } else {
+                        error = mensajeError ?: "Error al registrar el usuario"
                     }
                 }
             },

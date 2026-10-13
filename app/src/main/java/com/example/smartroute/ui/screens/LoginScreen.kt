@@ -91,12 +91,13 @@ fun LoginScreen(vm: SmartRouteViewModel, onLoggedIn: () -> Unit, onNavigateToReg
             onClick = {
                 if(email.isBlank() || password.isBlank()){
                     error = "Rellena los campos por favor"
+                    return@Button
                 }else{
-                    vm.login(email, password){ exito ->
+                    vm.loginWithAuth(email, password){ exito, mensajeError ->
                         if (exito){
                             onLoggedIn()
                         }else{
-                            error = "El correo no esta registrado en la base de datos"
+                            error = mensajeError ?: "Correo o contraseña incorrectos"
                         }
                     }
                 }
