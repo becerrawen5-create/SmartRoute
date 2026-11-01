@@ -1,5 +1,8 @@
 package com.example.smartroute
 
+import android.app.Activity
+import androidx.credentials.exceptions.GetCredentialException
+import android.util.Base64
 import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -7,14 +10,23 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.credentials.CredentialManager
+import androidx.credentials.CustomCredential
+import androidx.credentials.GetCredentialRequest
+import androidx.credentials.GetCredentialResponse
+import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import androidx.lifecycle.ViewModel
 import com.example.smartroute.ai.RecommendationEngine
 import com.example.smartroute.data.*
+import com.google.android.libraries.identity.googleid.GetGoogleIdOption
+import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
+import com.google.android.libraries.identity.googleid.GoogleIdTokenParsingException
 import com.google.firebase.Firebase
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.auth.FirebaseAuthException
+import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.firestore.firestore
 import org.mindrot.jbcrypt.BCrypt
+import java.security.SecureRandom
 import kotlin.math.roundToInt
 
 class SmartRouteViewModel : ViewModel() {
@@ -40,7 +52,6 @@ class SmartRouteViewModel : ViewModel() {
     val featuredRoute: RouteItem
         get() = routes.firstOrNull { it.favorite } ?: routes.first()
     //METODOS DEL LOGIN CON AUTENTICACION
-    //METODOS DE AUTENTICACION
     val auth = FirebaseAuth.getInstance()
     fun registerWithAuth(
         nombre: String,
@@ -158,6 +169,85 @@ class SmartRouteViewModel : ViewModel() {
             }
         }
         return null
+    }
+    //METODO DE REGISTRO CON GOOGLE
+    fun loginWithGoogle(idToken: String, onResult: (Boolean, String?)-> Unit){
+        val credential = GoogleAuthProvider.getCredential(idToken, null)
+
+        auth.signInWithCredential(credential)
+            .addOnSuccessListener { authResult ->
+                val user = authResult.user
+                if(user == null){
+                    onResult(false, "No se pudo obtener el usuairo")
+                    return@addOnSuccessListener
+                }
+
+                userName = user.displayName ?: user.email?.substringBefore("@") ?: "Usuario"
+                email = user.email ?: ""
+
+                val ref = db.collection("users").document(user.uid)
+                ref.get().addOnSuccessListener {
+                    doc ->
+                    if(!doc.exists()){
+                        ref.set(
+                            hashMapOf(
+                                "Nombre(s)" to (user.displayName?: ""),
+                                "email" to (user.email ?: ""),
+                                "uid" to user.uid
+                            )
+                        ).addOnFailureListener {
+                            Log.w("GoogleLogin", "No se pudo guardar en Firestore",it)
+                        }
+                    }
+                }
+                onResult(true, null)
+            }
+            .addOnFailureListener { e->
+                onResult(false, e.localizedMessage)
+            }
+    }
+    suspend fun signInWithGoogleCredential(activity: Activity, webClientId: String): String?{
+        val credentialManager = CredentialManager.create(activity)
+
+        // Configuración para cuentas autorizadas
+        val googleOption = GetSignInWithGoogleOption.Builder(webClientId)
+            .build()
+        val request = GetCredentialRequest.Builder()
+            .addCredentialOption(googleOption)
+            .build()
+        return try{
+            //solicitud de credenciales
+            val result = credentialManager.getCredential(
+                request = request,
+                context = activity
+            )
+            //token id de google
+            handleCredentialResult(result)
+        }catch (e: GetCredentialException){
+            // Imprime el tipo exacto de error en el Logcat para depurar
+            android.util.Log.e("AuthError", "Error tipo: ${e.type}, Mensaje: ${e.message}")
+            null
+        }
+    }
+    fun handleCredentialResult(result: GetCredentialResponse): String? {
+        val credential = result.credential
+        return when(credential){
+            is CustomCredential ->{
+                if(credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL){
+                    try {
+                        val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(credential.data)
+                        val googleIdToken = googleIdTokenCredential.idToken
+
+                        googleIdToken
+                    }catch (e: GoogleIdTokenParsingException){
+                        null
+                    }
+                }else{
+                    null
+                }
+            }
+            else -> null
+        }
     }
     //FIN DE LOS METODOS DEL LOGIN
     fun select(id: Int) {
