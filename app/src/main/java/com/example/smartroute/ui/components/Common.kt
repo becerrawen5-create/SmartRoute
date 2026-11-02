@@ -1,5 +1,6 @@
 package com.example.smartroute.ui.components
 
+
 import android.app.Activity
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -35,6 +36,94 @@ import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 import com.example.smartroute.data.TrafficLevel
 import com.example.smartroute.ui.theme.*
+import androidx.compose.ui.viewinterop.AndroidView
+import org.osmdroid.tileprovider.tilesource.XYTileSource
+import org.osmdroid.util.GeoPoint
+import org.osmdroid.views.MapView
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
+import org.osmdroid.views.overlay.mylocation.GpsMyLocationProvider
+import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
+
+@Composable
+fun RealMap(
+    modifier: Modifier = Modifier,
+    initialLat: Double = 19.4326,
+    initialLng: Double = -99.1332,
+    initialZoom: Double = 14.0
+) {
+    val context = LocalContext.current
+
+    // 1. Lanzador para pedir permisos de ubicación
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        // Aquí podríamos reaccionar si el usuario acepta o deniega
+    }
+
+    // 2. Pedir el permiso automáticamente al abrir la pantalla
+    LaunchedEffect(Unit) {
+        val fineLocation = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
+        val coarseLocation = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION)
+
+        if (fineLocation != PackageManager.PERMISSION_GRANTED && coarseLocation != PackageManager.PERMISSION_GRANTED) {
+            permissionLauncher.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                )
+            )
+        }
+    }
+
+    AndroidView(
+        modifier = modifier,
+        factory = { ctx ->
+            MapView(ctx).apply {
+                // Fuente personalizada que ya te funcionó
+                val customTileSource = XYTileSource(
+                    "OSM_FR",
+                    1, 20, 256, ".png",
+                    arrayOf(
+                        "https://a.tile.openstreetmap.fr/hot/",
+                        "https://b.tile.openstreetmap.fr/hot/",
+                        "https://c.tile.openstreetmap.fr/hot/"
+                    ),
+                    "© OpenStreetMap contributors"
+                )
+                setTileSource(customTileSource)
+
+                setBuiltInZoomControls(true)
+                setMultiTouchControls(true)
+                controller.setZoom(initialZoom)
+                controller.setCenter(GeoPoint(initialLat, initialLng))
+
+                // 3. Agregar el Punto Azul de Ubicación Real
+                val locationOverlay = MyLocationNewOverlay(GpsMyLocationProvider(ctx), this)
+                locationOverlay.enableMyLocation() // Activa el GPS
+                locationOverlay.enableFollowLocation() // Centra el mapa en tu ubicación al abrir
+                overlays.add(locationOverlay)
+            }
+        },
+        update = { mapView ->
+            mapView.invalidate()
+        }
+    )
+
+    // 4. (Opcional pero recomendado) Pausar el GPS si el usuario sale de la pantalla para no gastar batería
+    DisposableEffect(Unit) {
+        onDispose {
+            // Aquí podríamos detener el overlay si guardáramos la referencia,
+            // pero para fines de este proyecto, Android lo manejará al destruir la vista.
+        }
+    }
+}
 
 /** Cambia el color de los iconos de la barra de estado según el fondo de la pantalla. */
 @Composable

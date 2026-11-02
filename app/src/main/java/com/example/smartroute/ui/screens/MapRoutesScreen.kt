@@ -33,7 +33,7 @@ fun MapRoutesScreen(vm: SmartRouteViewModel, onBack: () -> Unit) {
     val minutes = vm.estimateMinutes(route, transport)
 
     Box(Modifier.fillMaxSize()) {
-        MapCanvas(Modifier.fillMaxSize())
+        RealMap(modifier = Modifier.fillMaxSize())
 
         Column(
             Modifier
