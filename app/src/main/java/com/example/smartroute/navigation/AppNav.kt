@@ -156,8 +156,8 @@ fun SmartRouteApp(vm: SmartRouteViewModel = viewModel()) {
             composable(Dest.WEATHER) { WeatherScreen(vm, onBack = { nav.popBackStack() }) }
             composable(Dest.TRAFFIC) { TrafficScreen(vm, onBack = { nav.popBackStack() }) }
             composable(Dest.PROFILE) {
-                ProfileScreen(vm, onLogout = {
-                    nav.navigate(Dest.LOGIN) { popUpTo(nav.graph.id) { inclusive = true } }
+                ProfileScreen(vm=vm, onLogout = {
+                    nav.navigate("login") { popUpTo(0) { inclusive = true } }
                 })
             }
         }

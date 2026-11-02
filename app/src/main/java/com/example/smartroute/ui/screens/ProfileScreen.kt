@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -26,6 +27,7 @@ import com.example.smartroute.ui.theme.*
 
 @Composable
 fun ProfileScreen(vm: SmartRouteViewModel, onLogout: () -> Unit) {
+    val context = LocalContext.current
     StatusBarStyle(darkIcons = true)
     val items: List<Pair<ImageVector, String>> = listOf(
         Icons.Filled.Person to "Mi perfil",
@@ -90,7 +92,7 @@ fun ProfileScreen(vm: SmartRouteViewModel, onLogout: () -> Unit) {
         }
 
         Spacer(Modifier.height(16.dp))
-        OutlinedButton(onClick = onLogout, modifier = Modifier.fillMaxWidth()) {
+        OutlinedButton(onClick = {vm.logout(context, onFinished = onLogout)}, modifier = Modifier.fillMaxWidth()) {
             Text("Cerrar sesión")
         }
         Spacer(Modifier.height(8.dp))

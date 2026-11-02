@@ -2,20 +2,22 @@ package com.example.smartroute
 
 import android.app.Activity
 import androidx.credentials.exceptions.GetCredentialException
-import android.util.Base64
 import android.util.Log
 import androidx.compose.runtime.getValue
+import android.content.Context
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.credentials.ClearCredentialStateRequest
 import androidx.credentials.CredentialManager
 import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
 import androidx.credentials.GetCredentialResponse
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.example.smartroute.ai.RecommendationEngine
 import com.example.smartroute.data.*
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
@@ -25,8 +27,8 @@ import com.google.firebase.Firebase
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.firestore.firestore
+import kotlinx.coroutines.launch
 import org.mindrot.jbcrypt.BCrypt
-import java.security.SecureRandom
 import kotlin.math.roundToInt
 
 class SmartRouteViewModel : ViewModel() {
@@ -250,6 +252,21 @@ class SmartRouteViewModel : ViewModel() {
         }
     }
     //FIN DE LOS METODOS DEL LOGIN
+    //LOGOUT
+    fun logout(context: Context, onFinished: ()->Unit){
+        auth.signOut()
+        userName =""
+        email = ""
+
+        viewModelScope.launch {
+            try {
+                CredentialManager.create(context.applicationContext)
+                    .clearCredentialState(ClearCredentialStateRequest())
+            }catch (e: Exception){
+                Log.w("Logout","No se puede limpiar el estado de credenciales",e)
+            }
+        }
+    }
     fun select(id: Int) {
         selectedRouteId = id
         learnedMessage = null
