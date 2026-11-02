@@ -58,7 +58,7 @@ fun SmartRouteApp(vm: SmartRouteViewModel = viewModel()) {
 
     Scaffold(
         containerColor = Color.White,
-        contentWindowInsets = WindowInsets.navigationBars,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         bottomBar = {
             if (tabs.any { it.route == current }) {
                 NavigationBar(containerColor = Color.White) {

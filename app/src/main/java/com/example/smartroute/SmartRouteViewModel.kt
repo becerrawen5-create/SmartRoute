@@ -138,7 +138,6 @@ class SmartRouteViewModel : ViewModel() {
                 onResult(false, e.localizedMessage)
             }
     }
-    //METODO PARA VALIDACIONES DE CONTRASEÑA
     fun validatePasswordSecurity(password: String): String? {
         if(password.length<10){
             return "La contraseña debe tner al menos 10 caracteres"
@@ -170,7 +169,6 @@ class SmartRouteViewModel : ViewModel() {
         }
         return null
     }
-    //METODO DE REGISTRO CON GOOGLE
     fun loginWithGoogle(idToken: String, onResult: (Boolean, String?)-> Unit){
         val credential = GoogleAuthProvider.getCredential(idToken, null)
 
@@ -208,15 +206,12 @@ class SmartRouteViewModel : ViewModel() {
     }
     suspend fun signInWithGoogleCredential(activity: Activity, webClientId: String): String?{
         val credentialManager = CredentialManager.create(activity)
-
-        // Configuración para cuentas autorizadas
         val googleOption = GetSignInWithGoogleOption.Builder(webClientId)
             .build()
         val request = GetCredentialRequest.Builder()
             .addCredentialOption(googleOption)
             .build()
         return try{
-            //solicitud de credenciales
             val result = credentialManager.getCredential(
                 request = request,
                 context = activity
@@ -224,7 +219,6 @@ class SmartRouteViewModel : ViewModel() {
             //token id de google
             handleCredentialResult(result)
         }catch (e: GetCredentialException){
-            // Imprime el tipo exacto de error en el Logcat para depurar
             android.util.Log.e("AuthError", "Error tipo: ${e.type}, Mensaje: ${e.message}")
             null
         }
@@ -249,21 +243,101 @@ class SmartRouteViewModel : ViewModel() {
             else -> null
         }
     }
-    //FIN DE LOS METODOS DEL LOGIN
     fun select(id: Int) {
         selectedRouteId = id
         learnedMessage = null
     }
 
-    fun toggleFavorite(id: Int) {
-        val i = routes.indexOfFirst { it.id == id }
-        if (i >= 0) routes[i] = routes[i].copy(favorite = !routes[i].favorite)
+
+    fun loadFavorites() {
+        val uid = auth.currentUser?.uid
+
+        if (uid == null) {
+            Log.w("Favorites", "No hay un usuario autenticado")
+            return
+        }
+
+        db.collection("userFavorites")
+            .document(uid)
+            .collection("routes")
+            .get()
+            .addOnSuccessListener { documents ->
+
+                val favoriteIds = documents.mapNotNull { it.id.toIntOrNull() }.toSet()
+
+                routes.forEachIndexed { index, route ->
+                    routes[index] = route.copy(
+                        favorite = route.id in favoriteIds
+                    )
+                }
+
+                Log.d("Favorites", "Favoritos cargados: $favoriteIds")
+            }
+            .addOnFailureListener { error ->
+                Log.e("Favorites", "Error al cargar favoritos", error)
+            }
     }
+
+    fun toggleFavorite(id: Int) {
+        val uid = auth.currentUser?.uid
+
+        if (uid == null) {
+            Log.w("Favorites", "No hay un usuario autenticado")
+            return
+        }
+
+        val index = routes.indexOfFirst { it.id == id }
+
+        if (index == -1) return
+
+        val route = routes[index]
+        val newFavorite = !route.favorite
+        routes[index] = route.copy(favorite = newFavorite)
+
+        val routeRef = db.collection("userFavorites")
+            .document(uid)
+            .collection("routes")
+            .document(id.toString())
+
+        if (newFavorite) {
+            val routeData = hashMapOf(
+                "id" to route.id,
+                "from" to route.from,
+                "to" to route.to,
+                "minutes" to route.minutes,
+                "km" to route.km,
+                "transport" to route.transport.name,
+                "favorite" to true,
+                "traffic" to route.traffic.name,
+                "preference" to route.preference.name,
+                "departure" to route.departure
+            )
+
+            routeRef.set(routeData)
+                .addOnSuccessListener {
+                    Log.d("Favorites", "Ruta guardada: ${route.title}")
+                }
+                .addOnFailureListener { error ->
+                    routes[index] = route.copy(favorite = false)
+                    Log.e("Favorites", "Error al guardar favorito", error)
+                }
+
+        } else {
+            routeRef.delete()
+                .addOnSuccessListener {
+                    Log.d("Favorites", "Ruta eliminada: ${route.title}")
+                }
+                .addOnFailureListener { error ->
+                    routes[index] = route.copy(favorite = true)
+                    Log.e("Favorites", "Error al eliminar favorito", error)
+                }
+        }
+    }
+
 
     fun recommendationFor(route: RouteItem): Recommendation =
         RecommendationEngine.recommend(route, weather, acceptedAdaptations)
 
-    /** El usuario elige la ruta adaptada: el sistema "aprende" la preferencia. */
     fun acceptAdaptation() {
         acceptedAdaptations += 1
         learnedMessage = "¡Listo! SmartRoute AI aprendió tu preferencia."
@@ -277,26 +351,131 @@ class SmartRouteViewModel : ViewModel() {
         if (transport == route.transport) route.minutes
         else (route.minutes * route.transport.speedKmh / transport.speedKmh).roundToInt().coerceAtLeast(3)
 
-    fun addRoute(from: String, to: String, transport: Transport, pref: RoutePreference): Int {
+
+    fun addRoute(
+        from: String,
+        to: String,
+        transport: Transport,
+        pref: RoutePreference
+    ): Int {
+        val uid = auth.currentUser?.uid
+
+        if (uid == null) {
+            Log.e("UserRoutes", "No hay un usuario autenticado")
+            return -1
+        }
+
         val id = (routes.maxOfOrNull { it.id } ?: 0) + 1
         val km = 3.0 + ((from.length + to.length) % 12)
-        val minutes = (km / transport.speedKmh * 60).roundToInt().coerceAtLeast(5)
-        routes.add(
-            RouteItem(
-                id = id,
-                from = from.ifBlank { "Mi ubicación" },
-                to = to.ifBlank { "Destino" },
-                minutes = minutes,
-                km = km,
-                transport = transport,
-                favorite = false,
-                traffic = TrafficLevel.FLUIDO,
-                preference = pref
-            )
+        val minutes = (km / transport.speedKmh * 60)
+            .roundToInt()
+            .coerceAtLeast(5)
+
+        val newRoute = RouteItem(
+            id = id,
+            from = from.ifBlank { "Mi ubicación" },
+            to = to.ifBlank { "Destino" },
+            minutes = minutes,
+            km = km,
+            transport = transport,
+            favorite = false,
+            traffic = TrafficLevel.FLUIDO,
+            preference = pref
         )
+        routes.add(newRoute)
         selectedRouteId = id
         learnedMessage = null
+        val routeData = hashMapOf(
+            "id" to newRoute.id,
+            "from" to newRoute.from,
+            "to" to newRoute.to,
+            "minutes" to newRoute.minutes,
+            "km" to newRoute.km,
+            "transport" to newRoute.transport.name,
+            "favorite" to false,
+            "traffic" to newRoute.traffic.name,
+            "preference" to newRoute.preference.name,
+            "departure" to newRoute.departure
+        )
+
+        db.collection("userRoutes")
+            .document(uid)
+            .collection("routes")
+            .document(id.toString())
+            .set(routeData)
+            .addOnSuccessListener {
+                Log.d("UserRoutes", "Ruta guardada: ${newRoute.title}")
+            }
+            .addOnFailureListener { error ->
+                Log.e("UserRoutes", "Error al guardar la ruta", error)
+            }
+
         return id
+    }
+
+    fun loadUserRoutes(onComplete: (() -> Unit)? = null) {
+        val uid = auth.currentUser?.uid
+
+        if (uid == null) {
+            Log.w("UserRoutes", "No hay usuario autenticado")
+            onComplete?.invoke()
+            return
+        }
+
+        db.collection("userRoutes")
+            .document(uid)
+            .collection("routes")
+            .get()
+            .addOnSuccessListener { documents ->
+
+                documents.forEach { document ->
+                    try {
+                        val id = document.getLong("id")?.toInt()
+                            ?: document.id.toInt()
+
+                        val route = RouteItem(
+                            id = id,
+                            from = document.getString("from") ?: "Mi ubicación",
+                            to = document.getString("to") ?: "Destino",
+                            minutes = document.getLong("minutes")?.toInt() ?: 5,
+                            km = document.getDouble("km") ?: 0.0,
+                            transport = Transport.valueOf(
+                                document.getString("transport") ?: "AUTO"
+                            ),
+                            favorite = false,
+                            traffic = TrafficLevel.valueOf(
+                                document.getString("traffic") ?: "FLUIDO"
+                            ),
+                            preference = RoutePreference.valueOf(
+                                document.getString("preference") ?: "RAPIDA"
+                            ),
+                            departure = document.getString("departure") ?: "7:30 a.m."
+                        )
+
+                        val index = routes.indexOfFirst { it.id == route.id }
+
+                        if (index >= 0) {
+                            routes[index] = route
+                        } else {
+                            routes.add(route)
+                        }
+
+                    } catch (error: Exception) {
+                        Log.e(
+                            "UserRoutes",
+                            "No se pudo recuperar la ruta ${document.id}",
+                            error
+                        )
+                    }
+                }
+
+                Log.d("UserRoutes", "Rutas recuperadas: ${documents.size()}")
+                onComplete?.invoke()
+            }
+            .addOnFailureListener { error ->
+                Log.e("UserRoutes", "Error al recuperar rutas", error)
+                onComplete?.invoke()
+            }
     }
 
     fun setIot(name: String, enabled: Boolean) {
