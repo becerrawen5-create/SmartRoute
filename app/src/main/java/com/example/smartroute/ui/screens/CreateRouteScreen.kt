@@ -26,6 +26,9 @@ import com.example.smartroute.data.Transport
 import com.example.smartroute.ui.components.*
 import com.example.smartroute.ui.theme.*
 
+// ↓ añade este import junto a los demás
+import kotlinx.coroutines.launch
+
 @Composable
 fun CreateRouteScreen(vm: SmartRouteViewModel, onBack: () -> Unit, onCreated: () -> Unit) {
     StatusBarStyle(darkIcons = true)
@@ -33,6 +36,12 @@ fun CreateRouteScreen(vm: SmartRouteViewModel, onBack: () -> Unit, onCreated: ()
     var to by remember { mutableStateOf("") }
     var pref by remember { mutableStateOf(RoutePreference.RAPIDA) }
     var transport by remember { mutableStateOf(Transport.AUTO) }
+
+    val scope = rememberCoroutineScope()
+
+    // Regla de la historia de usuario: sólo se puede buscar cuando
+    // origen y destino están completos.
+    val canSearch = from.isNotBlank() && to.isNotBlank() && !vm.isCalculatingRoute
 
     Column(
         Modifier
@@ -56,7 +65,8 @@ fun CreateRouteScreen(vm: SmartRouteViewModel, onBack: () -> Unit, onCreated: ()
                     Spacer(Modifier.height(8.dp))
                     OutlinedTextField(
                         value = to, onValueChange = { to = it },
-                        label = { Text("Hasta") }, placeholder = { Text("Universidad") }, singleLine = true,
+                        label = { Text("Hasta") },
+                        placeholder = { Text("Universidad") }, singleLine = true,
                         leadingIcon = { Icon(Icons.Filled.Place, null, tint = Danger) },
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -98,14 +108,42 @@ fun CreateRouteScreen(vm: SmartRouteViewModel, onBack: () -> Unit, onCreated: ()
         }
 
         Spacer(Modifier.height(28.dp))
+
+        // ↓ BOTÓN ACTUALIZADO ↓
         Button(
             onClick = {
-                vm.addRoute(from, to, transport, pref)
-                onCreated()
+                scope.launch {
+                    vm.calculateRoute(from, to, transport, pref)
+                    onCreated()   // navega al detalle (popUpTo CREATE en AppNav)
+                }
             },
+            enabled = canSearch,
             modifier = Modifier.fillMaxWidth().height(52.dp),
             shape = RoundedCornerShape(50)
-        ) { Text("Buscar ruta", fontWeight = FontWeight.Bold) }
+        ) {
+            if (vm.isCalculatingRoute) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(20.dp),
+                    strokeWidth = 2.dp,
+                    color = Color.White
+                )
+                Spacer(Modifier.width(8.dp))
+                Text("Calculando ruta…", fontWeight = FontWeight.Bold)
+            } else {
+                Text("Buscar ruta", fontWeight = FontWeight.Bold)
+            }
+        }
+
+        // Pista breve cuando falta el destino
+        if (to.isBlank() && !vm.isCalculatingRoute) {
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "Completa origen y destino para buscar una ruta.",
+                color = Muted,
+                fontSize = 12.sp
+            )
+        }
+
         Spacer(Modifier.height(16.dp))
     }
 }

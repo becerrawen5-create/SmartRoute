@@ -14,6 +14,7 @@ import com.google.firebase.Firebase
 import com.google.firebase.firestore.firestore
 import org.mindrot.jbcrypt.BCrypt
 import kotlin.math.roundToInt
+import kotlinx.coroutines.delay
 
 class SmartRouteViewModel : ViewModel() {
     private final val db = Firebase.firestore
@@ -31,6 +32,28 @@ class SmartRouteViewModel : ViewModel() {
     var selectedRouteId by mutableIntStateOf(1)
     var acceptedAdaptations by mutableIntStateOf(0)
     var learnedMessage by mutableStateOf<String?>(null)
+    // ↓ NUEVO estado expuesto a la UI
+    var isCalculatingRoute by mutableStateOf(false)
+        private set
+    /**
+     * Versión suspendida del cálculo para mostrar feedback en la UI.
+     * Se invoca desde la pantalla con `scope.launch { ... }`.
+     */
+    suspend fun calculateRoute(
+        from: String,
+        to: String,
+        transport: Transport,
+        pref: RoutePreference
+    ): Int {
+        isCalculatingRoute = true
+        return try {
+            delay(600)                    // simula el "cálculo" del motor
+            addRoute(from, to, transport, pref)
+        } finally {
+            isCalculatingRoute = false
+        }
+    }
+
 
     val selectedRoute: RouteItem
         get() = routes.firstOrNull { it.id == selectedRouteId } ?: routes.first()
@@ -112,6 +135,21 @@ class SmartRouteViewModel : ViewModel() {
         val i = routes.indexOfFirst { it.id == id }
         if (i >= 0) routes[i] = routes[i].copy(favorite = !routes[i].favorite)
     }
+    /**
+     * Elimina la ruta con [id].
+     * @return true si se borró; false si no existe o era la última ruta
+     *         (para no dejar la app sin datos, ya que Home/Detail usan `routes.first()`).
+     */
+    fun deleteRoute(id: Int): Boolean {
+        if (routes.size <= 1) return false
+        val i = routes.indexOfFirst { it.id == id }
+        if (i < 0) return false
+        routes.removeAt(i)
+        if (selectedRouteId == id) {
+            selectedRouteId = routes.first().id
+        }
+        return true
+    }
 
     fun recommendationFor(route: RouteItem): Recommendation =
         RecommendationEngine.recommend(route, weather, acceptedAdaptations)
@@ -132,18 +170,54 @@ class SmartRouteViewModel : ViewModel() {
 
     fun addRoute(from: String, to: String, transport: Transport, pref: RoutePreference): Int {
         val id = (routes.maxOfOrNull { it.id } ?: 0) + 1
-        val km = 3.0 + ((from.length + to.length) % 12)
-        val minutes = (km / transport.speedKmh * 60).roundToInt().coerceAtLeast(5)
+
+        // Distancia determinística (misma idea que ya tenías)
+        val baseKm = 3.0 + ((from.length + to.length) % 12)
+
+        // 1) El nivel de tráfico que enfrentará la ruta depende de la preferencia:
+        //    - Rápida: acepta las vías directas (puede caer en lluvia → moderado)
+        //    - Segura: prefiere calles tranquilas → moderado
+        //    - Evitar tráfico: busca explícitamente vías fluidas
+        val traffic = when (pref) {
+            RoutePreference.RAPIDA ->
+                if (weather.rainChance >= 50) TrafficLevel.MODERADO else TrafficLevel.FLUIDO
+            RoutePreference.SEGURA -> TrafficLevel.MODERADO
+            RoutePreference.EVITAR_TRAFICO -> TrafficLevel.FLUIDO
+        }
+
+        // 2) Tiempo base según el medio de transporte
+        val baseMinutes = (baseKm / transport.speedKmh * 60).roundToInt().coerceAtLeast(3)
+
+        // 3) Ajuste por preferencia
+        val prefFactor = when (pref) {
+            RoutePreference.RAPIDA -> 1.00          // mínimo tiempo
+            RoutePreference.SEGURA -> 1.18          // unos min más, pero más segura
+            RoutePreference.EVITAR_TRAFICO -> 1.12  // desvío para no caer en congestión
+        }
+        val prefMinutes = (baseMinutes * prefFactor).roundToInt()
+
+        // 4) Ajuste por clima (lluvia ≥ 50 %)
+        val rainExtra = if (weather.rainChance >= 50) 4 else 0
+
+        // 5) Ajuste por el tráfico resultante
+        val trafficExtra = when (traffic) {
+            TrafficLevel.FLUIDO -> 0
+            TrafficLevel.MODERADO -> 3
+            TrafficLevel.LENTO -> 8
+        }
+
+        val finalMinutes = (prefMinutes + rainExtra + trafficExtra).coerceAtLeast(3)
+
         routes.add(
             RouteItem(
                 id = id,
                 from = from.ifBlank { "Mi ubicación" },
                 to = to.ifBlank { "Destino" },
-                minutes = minutes,
-                km = km,
+                minutes = finalMinutes,
+                km = baseKm,
                 transport = transport,
                 favorite = false,
-                traffic = TrafficLevel.FLUIDO,
+                traffic = traffic,
                 preference = pref
             )
         )
@@ -151,8 +225,8 @@ class SmartRouteViewModel : ViewModel() {
         learnedMessage = null
         return id
     }
-
     fun setIot(name: String, enabled: Boolean) {
         iotSources[name] = enabled
     }
+
 }
