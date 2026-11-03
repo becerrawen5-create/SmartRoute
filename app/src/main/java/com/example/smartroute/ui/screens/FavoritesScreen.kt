@@ -9,10 +9,15 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -21,12 +26,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.smartroute.SmartRouteViewModel
+import com.example.smartroute.data.RouteItem
 import com.example.smartroute.ui.components.*
 import com.example.smartroute.ui.theme.*
 
 @Composable
 fun FavoritesScreen(vm: SmartRouteViewModel, onOpenRoute: (Int) -> Unit, onAddRoute: () -> Unit) {
     StatusBarStyle(darkIcons = false)
+
+    // Ruta pendiente de eliminar (para el diálogo de confirmación)
+    var pendingDelete by remember { mutableStateOf<RouteItem?>(null) }
+
     Column(
         Modifier
             .fillMaxSize()
@@ -66,6 +76,14 @@ fun FavoritesScreen(vm: SmartRouteViewModel, onOpenRoute: (Int) -> Unit, onAddRo
                                 tint = if (route.favorite) Danger else Muted
                             )
                         }
+                        // ↓ Nuevo botón de eliminar ↓
+                        IconButton(onClick = { pendingDelete = route }) {
+                            Icon(
+                                Icons.Filled.Delete,
+                                contentDescription = "Eliminar ruta",
+                                tint = Danger
+                            )
+                        }
                     }
                 }
             }
@@ -80,5 +98,34 @@ fun FavoritesScreen(vm: SmartRouteViewModel, onOpenRoute: (Int) -> Unit, onAddRo
                 Text("Añadir ruta", fontWeight = FontWeight.Bold)
             }
         }
+    }
+
+    // ↓ Diálogo de confirmación (fuera del Column) ↓
+    pendingDelete?.let { route ->
+        AlertDialog(
+            onDismissRequest = { pendingDelete = null },
+            icon = { Icon(Icons.Filled.Delete, null, tint = Danger) },
+            title = { Text("Eliminar ruta") },
+            text = {
+                if (vm.routes.size <= 1) {
+                    Text("Debe existir al menos una ruta guardada. Crea una nueva antes de eliminar esta.")
+                } else {
+                    Text("¿Eliminar \"${route.title}\"? Esta acción no se puede deshacer.")
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        vm.deleteRoute(route.id)
+                        pendingDelete = null
+                    },
+                    enabled = vm.routes.size > 1,
+                    colors = ButtonDefaults.textButtonColors(contentColor = Danger)
+                ) { Text("Eliminar") }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDelete = null }) { Text("Cancelar") }
+            }
+        )
     }
 }
