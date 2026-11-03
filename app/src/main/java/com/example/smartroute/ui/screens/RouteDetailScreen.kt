@@ -26,7 +26,6 @@ fun RouteDetailScreen(vm: SmartRouteViewModel, onBack: () -> Unit, onOpenMap: ()
     val route = vm.selectedRoute
     val rec = vm.recommendationFor(route)
     var tab by remember { mutableIntStateOf(0) }
-    var showDeleteDialog by remember { mutableStateOf(false) }
 
     Column(
         Modifier
@@ -102,67 +101,20 @@ fun RouteDetailScreen(vm: SmartRouteViewModel, onBack: () -> Unit, onOpenMap: ()
             }
         }
 
-        Row(
-            Modifier
+        Button(
+            onClick = { vm.toggleFavorite(route.id) },
+            modifier = Modifier
                 .padding(horizontal = 16.dp)
                 .offset(y = (-16).dp)
-                .fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                .fillMaxWidth()
+                .height(52.dp),
+            shape = RoundedCornerShape(50)
         ) {
-            Button(
-                onClick = { vm.toggleFavorite(route.id) },
-                modifier = Modifier.weight(1f).height(52.dp),
-                shape = RoundedCornerShape(50)
-            ) {
-                Icon(
-                    if (route.favorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
-                    null
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    if (route.favorite) "Quitar favorito" else "Guardar favorito",
-                    fontWeight = FontWeight.Bold
-                )
-            }
-            OutlinedButton(
-                onClick = { showDeleteDialog = true },
-                modifier = Modifier.height(52.dp),
-                shape = RoundedCornerShape(50),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = Danger)
-            ) {
-                Icon(Icons.Filled.Delete, null)
-                Spacer(Modifier.width(6.dp))
-                Text("Eliminar", fontWeight = FontWeight.Bold)
-            }
+            Icon(if (route.favorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder, null)
+            Spacer(Modifier.width(8.dp))
+            Text(if (route.favorite) "Quitar de favoritos" else "Guardar en favoritos", fontWeight = FontWeight.Bold)
         }
         Spacer(Modifier.height(8.dp))
-    }
-    if (showDeleteDialog) {
-        AlertDialog(
-            onDismissRequest = { showDeleteDialog = false },
-            icon = { Icon(Icons.Filled.Delete, null, tint = Danger) },
-            title = { Text("Eliminar ruta") },
-            text = {
-                if (vm.routes.size <= 1) {
-                    Text("Debe existir al menos una ruta guardada. Crea una nueva antes de eliminar esta.")
-                } else {
-                    Text("¿Seguro que quieres eliminar \"${route.title}\"? Esta acción no se puede deshacer.")
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showDeleteDialog = false
-                        if (vm.deleteRoute(route.id)) onBack()
-                    },
-                    enabled = vm.routes.size > 1,
-                    colors = ButtonDefaults.textButtonColors(contentColor = Danger)
-                ) { Text("Eliminar") }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDeleteDialog = false }) { Text("Cancelar") }
-            }
-        )
     }
 }
 
