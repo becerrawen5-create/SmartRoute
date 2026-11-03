@@ -325,6 +325,8 @@ class SmartRouteViewModel : ViewModel() {
                     .clearCredentialState(ClearCredentialStateRequest())
             }catch (e: Exception){
                 Log.w("Logout","No se puede limpiar el estado de credenciales",e)
+            } finally {
+                onFinished()
             }
         }
     }
