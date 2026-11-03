@@ -15,6 +15,12 @@ import com.google.firebase.firestore.firestore
 import org.mindrot.jbcrypt.BCrypt
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
+import com.example.smartroute.data.GeocodingClient
+import com.example.smartroute.data.NominatimResult
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.Job
+
+import kotlinx.coroutines.launch
 
 class SmartRouteViewModel : ViewModel() {
     private final val db = Firebase.firestore
@@ -27,6 +33,7 @@ class SmartRouteViewModel : ViewModel() {
     val zones: List<TrafficZone> = SampleData.trafficZones
     val iotSources = mutableStateMapOf<String, Boolean>().apply {
         SampleData.iotSources.forEach { put(it, true) }
+
     }
 
     var selectedRouteId by mutableIntStateOf(1)
@@ -35,6 +42,37 @@ class SmartRouteViewModel : ViewModel() {
     // ↓ NUEVO estado expuesto a la UI
     var isCalculatingRoute by mutableStateOf(false)
         private set
+    var fromSuggestions by mutableStateOf<List<NominatimResult>>(emptyList())
+    var toSuggestions by mutableStateOf<List<NominatimResult>>(emptyList())
+
+
+    private var searchFromJob: Job? = null
+    private var searchToJob: Job? = null
+
+    fun searchAddress(query: String, isOrigin: Boolean) {
+        val job = if (isOrigin) searchFromJob else searchToJob
+        job?.cancel()
+
+        if (query.length < 3) {
+            if (isOrigin) fromSuggestions = emptyList() else toSuggestions = emptyList()
+            return
+        }
+
+        val newJob = viewModelScope.launch {
+            delay(300) // Debounce
+            try {
+                // Llamamos a Nominatim
+                val results = GeocodingClient.service.search(query)
+                Log.d("BusquedaDebug", "Nominatim: ${results.size} resultados para '$query'")
+
+                if (isOrigin) fromSuggestions = results else toSuggestions = results
+            } catch (e: Exception) {
+                Log.e("BusquedaDebug", "Error en Nominatim: ${e.message}", e)
+                if (isOrigin) fromSuggestions = emptyList() else toSuggestions = emptyList()
+            }
+        }
+        if (isOrigin) searchFromJob = newJob else searchToJob = newJob
+    }
     /**
      * Versión suspendida del cálculo para mostrar feedback en la UI.
      * Se invoca desde la pantalla con `scope.launch { ... }`.

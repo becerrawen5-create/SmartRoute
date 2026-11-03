@@ -56,4 +56,8 @@ dependencies {
     implementation("org.osmdroid:osmdroid-android:6.1.18")
 
     implementation("com.google.maps.android:maps-compose:6.1.0")
+
+    // Para peticiones HTTP y parseo de JSON
+    implementation("com.squareup.retrofit2:retrofit:2.11.0")
+    implementation("com.squareup.retrofit2:converter-gson:2.11.0")
 }

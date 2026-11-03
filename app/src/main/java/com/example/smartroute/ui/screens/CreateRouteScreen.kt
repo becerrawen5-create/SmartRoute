@@ -21,14 +21,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.smartroute.SmartRouteViewModel
+import com.example.smartroute.data.NominatimResult
 import com.example.smartroute.data.RoutePreference
 import com.example.smartroute.data.Transport
 import com.example.smartroute.ui.components.*
 import com.example.smartroute.ui.theme.*
-
-// ↓ añade este import junto a los demás
 import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CreateRouteScreen(vm: SmartRouteViewModel, onBack: () -> Unit, onCreated: () -> Unit) {
     StatusBarStyle(darkIcons = true)
@@ -38,9 +38,6 @@ fun CreateRouteScreen(vm: SmartRouteViewModel, onBack: () -> Unit, onCreated: ()
     var transport by remember { mutableStateOf(Transport.AUTO) }
 
     val scope = rememberCoroutineScope()
-
-    // Regla de la historia de usuario: sólo se puede buscar cuando
-    // origen y destino están completos.
     val canSearch = from.isNotBlank() && to.isNotBlank() && !vm.isCalculatingRoute
 
     Column(
@@ -48,6 +45,7 @@ fun CreateRouteScreen(vm: SmartRouteViewModel, onBack: () -> Unit, onCreated: ()
             .fillMaxSize()
             .background(Color.White)
             .statusBarsPadding()
+            .imePadding()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 16.dp)
     ) {
@@ -56,21 +54,48 @@ fun CreateRouteScreen(vm: SmartRouteViewModel, onBack: () -> Unit, onCreated: ()
         AppCard(Modifier.fillMaxWidth()) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    OutlinedTextField(
-                        value = from, onValueChange = { from = it },
-                        label = { Text("Desde") }, singleLine = true,
-                        leadingIcon = { Icon(Icons.Filled.MyLocation, null, tint = Blue600) },
-                        modifier = Modifier.fillMaxWidth()
+
+                    // --- CAMPO DESDE ---
+                    AutocompleteTextField(
+                        value = from,
+                        onValueChange = {
+                            from = it
+                            vm.searchAddress(it, isOrigin = true)
+                        },
+                        label = "Desde",
+                        leadingIcon = Icons.Filled.MyLocation,
+                        iconTint = Blue600,
+                        suggestions = vm.fromSuggestions,
+                        onClearSuggestions = { vm.fromSuggestions = emptyList() },
+                        onSuggestionSelected = { result ->
+                            // ✅ CORREGIDO: Usamos display_name
+                            from = result.display_name
+                            vm.fromSuggestions = emptyList()
+                        }
                     )
+
                     Spacer(Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = to, onValueChange = { to = it },
-                        label = { Text("Hasta") },
-                        placeholder = { Text("Universidad") }, singleLine = true,
-                        leadingIcon = { Icon(Icons.Filled.Place, null, tint = Danger) },
-                        modifier = Modifier.fillMaxWidth()
+
+                    // --- CAMPO HASTA ---
+                    AutocompleteTextField(
+                        value = to,
+                        onValueChange = {
+                            to = it
+                            vm.searchAddress(it, isOrigin = false)
+                        },
+                        label = "Hasta",
+                        leadingIcon = Icons.Filled.Place,
+                        iconTint = Danger,
+                        suggestions = vm.toSuggestions,
+                        onClearSuggestions = { vm.toSuggestions = emptyList() },
+                        onSuggestionSelected = { result ->
+                            // ✅ CORREGIDO: Usamos display_name
+                            to = result.display_name
+                            vm.toSuggestions = emptyList()
+                        }
                     )
                 }
+
                 IconButton(onClick = { val t = from; from = to; to = t }) {
                     Icon(Icons.Filled.SwapVert, "Invertir", tint = Blue600)
                 }
@@ -109,12 +134,11 @@ fun CreateRouteScreen(vm: SmartRouteViewModel, onBack: () -> Unit, onCreated: ()
 
         Spacer(Modifier.height(28.dp))
 
-        // ↓ BOTÓN ACTUALIZADO ↓
         Button(
             onClick = {
                 scope.launch {
                     vm.calculateRoute(from, to, transport, pref)
-                    onCreated()   // navega al detalle (popUpTo CREATE en AppNav)
+                    onCreated()
                 }
             },
             enabled = canSearch,
@@ -122,11 +146,7 @@ fun CreateRouteScreen(vm: SmartRouteViewModel, onBack: () -> Unit, onCreated: ()
             shape = RoundedCornerShape(50)
         ) {
             if (vm.isCalculatingRoute) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(20.dp),
-                    strokeWidth = 2.dp,
-                    color = Color.White
-                )
+                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = Color.White)
                 Spacer(Modifier.width(8.dp))
                 Text("Calculando ruta…", fontWeight = FontWeight.Bold)
             } else {
@@ -134,27 +154,78 @@ fun CreateRouteScreen(vm: SmartRouteViewModel, onBack: () -> Unit, onCreated: ()
             }
         }
 
-        // Pista breve cuando falta el destino
-        if (to.isBlank() && !vm.isCalculatingRoute) {
-            Spacer(Modifier.height(8.dp))
-            Text(
-                "Completa origen y destino para buscar una ruta.",
-                color = Muted,
-                fontSize = 12.sp
-            )
-        }
-
         Spacer(Modifier.height(16.dp))
     }
 }
 
+// --- NUEVO COMPONENTE REUTILIZABLE PARA EL AUTOCOMPLETADO ---
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun PrefItem(
-    icon: ImageVector,
-    value: RoutePreference,
-    selected: RoutePreference,
-    onSelect: (RoutePreference) -> Unit
+private fun AutocompleteTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    leadingIcon: ImageVector,
+    iconTint: Color,
+    suggestions: List<NominatimResult>,
+    onClearSuggestions: () -> Unit,
+    onSuggestionSelected: (NominatimResult) -> Unit
 ) {
+    var expanded by remember { mutableStateOf(false) }
+
+    // ESTO ES CLAVE: Si llegan sugerencias nuevas, abrimos el menú a la fuerza
+    LaunchedEffect(suggestions) {
+        if (suggestions.isNotEmpty()) {
+            expanded = true
+        }
+    }
+
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = it },
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = {
+                onValueChange(it)
+                if (it.length < 3) expanded = false
+            },
+            label = { Text(label) },
+            singleLine = true,
+            leadingIcon = { Icon(leadingIcon, null, tint = iconTint) },
+            modifier = Modifier
+                .menuAnchor(MenuAnchorType.PrimaryEditable) // Asegura que el menú se ancle al texto
+                .fillMaxWidth()
+        )
+
+        ExposedDropdownMenu(
+            expanded = expanded && suggestions.isNotEmpty(),
+            onDismissRequest = {
+                expanded = false
+                onClearSuggestions()
+            }
+        ) {
+            suggestions.forEach { feature ->
+                DropdownMenuItem(
+                    text = { Text(formatSuggestion(feature), fontSize = 14.sp) },
+                    onClick = {
+                        onSuggestionSelected(feature)
+                        expanded = false
+                    }
+                )
+            }
+        }
+    }
+}
+
+private fun formatSuggestion(result: NominatimResult): String {
+    // Nominatim devuelve el nombre completo en display_name
+    return result.display_name
+}
+
+@Composable
+private fun PrefItem(icon: ImageVector, value: RoutePreference, selected: RoutePreference, onSelect: (RoutePreference) -> Unit) {
     val isSelected = value == selected
     Column(
         Modifier.clip(RoundedCornerShape(12.dp)).clickable { onSelect(value) }.padding(6.dp),
