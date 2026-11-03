@@ -124,7 +124,12 @@ fun RegisterScreen(
         Spacer(Modifier.height(12.dp))
         OutlinedTextField(
             value = password,
-            onValueChange = {password = it; error= null},
+            onValueChange = {
+                if(it.length<=12){
+                    password = it
+                    error = null
+                }
+            },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             shape = RoundedCornerShape(12.dp),
@@ -135,8 +140,11 @@ fun RegisterScreen(
                     Icon(if (showPass) Icons.Filled.VisibilityOff else Icons.Filled.Visibility, "Mostrar contraseña")
                 }
             },
+
             visualTransformation = if (showPass) VisualTransformation.None else PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
+
+
         )
         Spacer(Modifier.height(20.dp))
 
@@ -145,17 +153,25 @@ fun RegisterScreen(
         }
         Button(
             onClick = {
-                if(nombre.isBlank() || apellidoPaterno.isBlank() || apellidoMaterno.isBlank() || email.isBlank()|| password.isBlank()){
-                    error="Por favor completa los campos obligatorios"
+                if (nombre.isBlank() || apellidoPaterno.isBlank() || apellidoMaterno.isBlank() || email.isBlank() || password.isBlank()) {
+                    error = "Por favor completa los campos obligatorios"
                     return@Button
                 }
+
+                val errorPassword = vm.validatePasswordSecurity(password)
+                if (errorPassword != null) {
+                    error = errorPassword
+                    return@Button
+                }
+
                 isLoading = true
-                vm.registerUser(nombre, apellidoPaterno, apellidoMaterno, email, password){
-                    exito-> isLoading=false
-                    if(exito){
+                vm.registerWithAuth(nombre, apellidoPaterno, apellidoMaterno, email, password) { exito, mensajeError ->
+                    isLoading = false
+                    if (exito) {
+                        error = "¡Registro exitoso! Revisa tu correo para verificar tu cuenta."
                         onRegistered()
-                    }else{
-                        error="Error al registrar el usuario"
+                    } else {
+                        error = mensajeError ?: "Error al registrar el usuario"
                     }
                 }
             },

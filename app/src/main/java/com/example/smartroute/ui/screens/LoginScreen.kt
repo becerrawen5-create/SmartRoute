@@ -1,5 +1,7 @@
 package com.example.smartroute.ui.screens
 
+import android.app.Activity
+import android.widget.Toast
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -14,6 +16,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -26,6 +29,11 @@ import com.example.smartroute.ui.components.BrandText
 import com.example.smartroute.ui.components.SmartLogo
 import com.example.smartroute.ui.components.StatusBarStyle
 import com.example.smartroute.ui.theme.*
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.GoogleAuthProvider
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.SetOptions
+import kotlinx.coroutines.launch
 
 @Composable
 fun LoginScreen(vm: SmartRouteViewModel, onLoggedIn: () -> Unit, onNavigateToRegister: () -> Unit) {
@@ -91,12 +99,13 @@ fun LoginScreen(vm: SmartRouteViewModel, onLoggedIn: () -> Unit, onNavigateToReg
             onClick = {
                 if(email.isBlank() || password.isBlank()){
                     error = "Rellena los campos por favor"
+                    return@Button
                 }else{
-                    vm.login(email, password){ exito ->
+                    vm.loginWithAuth(email, password){ exito, mensajeError ->
                         if (exito){
                             onLoggedIn()
                         }else{
-                            error = "El correo no esta registrado en la base de datos"
+                            error = mensajeError ?: "Correo o contraseña incorrectos"
                         }
                     }
                 }
@@ -109,11 +118,28 @@ fun LoginScreen(vm: SmartRouteViewModel, onLoggedIn: () -> Unit, onNavigateToReg
         Text("o continúa con", color = Muted, fontSize = 12.sp)
         Spacer(Modifier.height(12.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            OutlinedButton(onClick = onLoggedIn, modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp)) {
+            val context = LocalContext.current
+            val activity = context as? Activity
+            val scope = rememberCoroutineScope()
+            OutlinedButton(onClick ={
+                if(activity!=null){
+                    scope.launch {
+                        val idToken = vm.signInWithGoogleCredential(
+                            activity = activity,
+                            webClientId = "927563966222-3ph7vlbe8npfugkuj0kqskr3adrkpm1b.apps.googleusercontent.com"
+                        )
+                        if(idToken!=null){
+                            vm.loginWithGoogle(idToken){
+                                ok, error->
+                                if(ok)onLoggedIn()
+                                else android.util.Log.e("AuthError", "Fallo login con Google: $error")
+                            }
+                        }
+                    }
+                }
+            } ,
+                modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp)) {
                 Text("Google")
-            }
-            OutlinedButton(onClick = onLoggedIn, modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp)) {
-                Text("Apple")
             }
         }
         Spacer(Modifier.height(24.dp))

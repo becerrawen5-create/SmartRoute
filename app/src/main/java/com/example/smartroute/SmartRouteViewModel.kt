@@ -1,17 +1,33 @@
 package com.example.smartroute
 
+import android.app.Activity
+import androidx.credentials.exceptions.GetCredentialException
 import android.util.Log
 import androidx.compose.runtime.getValue
+import android.content.Context
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.credentials.ClearCredentialStateRequest
+import androidx.credentials.CredentialManager
+import androidx.credentials.CustomCredential
+import androidx.credentials.GetCredentialRequest
+import androidx.credentials.GetCredentialResponse
+import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.example.smartroute.ai.RecommendationEngine
 import com.example.smartroute.data.*
+import com.google.android.libraries.identity.googleid.GetGoogleIdOption
+import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
+import com.google.android.libraries.identity.googleid.GoogleIdTokenParsingException
 import com.google.firebase.Firebase
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.firestore.firestore
+import kotlinx.coroutines.launch
 import org.mindrot.jbcrypt.BCrypt
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
@@ -60,16 +76,17 @@ class SmartRouteViewModel : ViewModel() {
 
     val featuredRoute: RouteItem
         get() = routes.firstOrNull { it.favorite } ?: routes.first()
-
-    fun registerUser(
+    //METODOS DEL LOGIN CON AUTENTICACION
+    val auth = FirebaseAuth.getInstance()
+    fun registerWithAuth(
         nombre: String,
         apellidoPaterno: String,
         apellidoMaterno: String,
         emailInput: String,
-        passInput: String,
-        onResult: (Boolean) -> Unit
+        passwordInput: String,
+        onResult: (Boolean, String?) -> Unit
     ) {
-       val hashPassword= BCrypt.hashpw(passInput, BCrypt.gensalt())
+        val hashPassword = BCrypt.hashpw(passwordInput, BCrypt.gensalt())
         val nuevoUsuario = hashMapOf(
             "Nombre(s)" to nombre,
             "Apellido paterno" to apellidoPaterno,
@@ -78,54 +95,201 @@ class SmartRouteViewModel : ViewModel() {
             "password" to hashPassword
         )
 
-        db.collection("users")
-            .add(nuevoUsuario)
-            .addOnSuccessListener { documentReference ->
-                Log.d("RegisterDebug", "Usuario registrado con ID: ${documentReference.id}")
-                userName = nombre
-                email = emailInput
-                onResult(true)
+        auth.createUserWithEmailAndPassword(emailInput, passwordInput)
+            .addOnSuccessListener { authResult ->
+                val user = authResult.user
+
+                db.collection("users")
+                    .add(nuevoUsuario)
+                    .addOnSuccessListener { documentReference ->
+                        Log.d("RegisterDebug", "Usuario registrado en Firestore con ID: ${documentReference.id}")
+                        userName = nombre
+                        email = emailInput
+
+                        user?.sendEmailVerification()?.addOnCompleteListener { task ->
+                            if (task.isSuccessful) {
+                                onResult(true, null)
+                            } else {
+                                onResult(false, "Se creó el usuario pero falló el envío del correo")
+                            }
+                        }
+                    }
+                    .addOnFailureListener { e ->
+                        Log.w("RegisterDebug", "Error al registrar usuario en Firestore", e)
+                        onResult(false, "Error al guardar datos de usuario en la base de datos")
+                    }
             }
             .addOnFailureListener { e ->
-                Log.w("RegisterDebug", "Error al registrar usuario", e)
-                onResult(false)
-            }
-    }
-    /** Metodo para el logearse ya conectado a la base de datos */
-    fun login(emailInput: String, passwordInput: String, onResult: (Boolean) -> Unit) {
-        if (emailInput.isBlank() || passwordInput.isBlank()) {
-            onResult(false)
-            return
-        }
-        Log.d("LoginDebug", "Buscando - Email: '${emailInput.trim()}'")
-        db.collection("users")
-            .whereEqualTo("email", emailInput.trim())
-            .get()
-            .addOnSuccessListener { documents ->
-                if (!documents.isEmpty) {
-                    val document = documents.documents[0]
-                    val storeHash = document.getString("password") ?: ""
-                    if(BCrypt.checkpw(passwordInput, storeHash)){
-                        userName = document.getString("Nombre(s)")?:"Usuario"
-                        email = document.getString("email")?: emailInput
-                        Log.d("LoginDebug", "¡Inicio de sesión exitoso con contraseña encriptada!")
-                        onResult(true)
-                    }else{
-                        // La contraseña no coincide con el hash
-                        Log.d("LoginDebug", "Contraseña incorrecta.")
-                        onResult(false)
-                    }
-                } else {
-                    Log.d("LoginDebug", "Correo o contraseña incorrectos en la BD.")
-                    onResult(false)
-                }
-            }
-            .addOnFailureListener { exception ->
-                Log.w("LoginDebug", "Error al conectar con Firestore", exception)
-                onResult(false)
+                onResult(false, e.localizedMessage)
             }
     }
 
+    fun loginWithAuth(emailInput: String, passwordInput: String, onResult: (Boolean, String?) -> Unit) {
+        if (emailInput.isBlank() || passwordInput.isBlank()) {
+            onResult(false, "Por favor completa todos los campos")
+            return
+        }
+
+        auth.signInWithEmailAndPassword(emailInput, passwordInput)
+            .addOnSuccessListener { authResult ->
+                val user = authResult.user
+                if (user != null && user.isEmailVerified) {
+                    Log.d("LoginDebug", "Buscando en Firestore - Email: '${emailInput.trim()}'")
+                    db.collection("users")
+                        .whereEqualTo("email", emailInput.trim())
+                        .get()
+                        .addOnSuccessListener { documents ->
+                            if (!documents.isEmpty) {
+                                val document = documents.documents[0]
+                                userName = document.getString("Nombre(s)") ?: "Usuario"
+                                email = document.getString("email") ?: emailInput
+                                Log.d("LoginDebug", "¡Inicio de sesión exitoso con Auth y datos cargados de Firestore!")
+                            } else {
+                                email = emailInput
+                            }
+                            onResult(true, null)
+                        }
+                        .addOnFailureListener { exception ->
+                            Log.w("LoginDebug", "Error al conectar con Firestore", exception)
+                            email = emailInput
+                            onResult(true, null)
+                        }
+                } else {
+                    auth.signOut()
+                    onResult(false, "Por favor verifica tu correo")
+                }
+            }
+            .addOnFailureListener { e ->
+                onResult(false, e.localizedMessage)
+            }
+    }
+    //METODO PARA VALIDACIONES DE CONTRASEÑA
+    fun validatePasswordSecurity(password: String): String? {
+        if(password.length<10){
+            return "La contraseña debe tner al menos 10 caracteres"
+        }
+        val mayuscula =password.any{it.isUpperCase()}
+        val minuscula = password.any { it.isLowerCase() }
+        val numero = password.any { it.isDigit() }
+        val simbolo = password.any { it.isLetterOrDigit() }
+
+        if(!mayuscula) return "Debe tener al menos una letra mayuscula"
+        if(!minuscula) return "Debe tener al menos una letra minuscula"
+        if(!numero) return "Debe tener al menos un numero"
+        if (!simbolo) return "Debe tener al menos un simolo especial (ej. @, _, ?, #"
+
+        for( i in 0 until password.length-2){
+            val c1 = password[i]
+            val c2 = password[i+1]
+            val c3 = password[i+2]
+
+            if(c1.isDigit() && c2.isDigit() && c3.isDigit()){
+                val secuenciaAscendente = (c2-c1 == 1 && c3-c2 ==1)
+                val secuenciaDescendente = (c1-c2 == 1 && c2-c3 ==1)
+                val repetido = (c1==c2 && c2==c3)
+
+                if(secuenciaAscendente || secuenciaDescendente || repetido){
+                    return "No se permiten números consecutivos (ej. 123) ni repetidos (ej. 111)."
+                }
+            }
+        }
+        return null
+    }
+    //METODO DE REGISTRO CON GOOGLE
+    fun loginWithGoogle(idToken: String, onResult: (Boolean, String?)-> Unit){
+        val credential = GoogleAuthProvider.getCredential(idToken, null)
+
+        auth.signInWithCredential(credential)
+            .addOnSuccessListener { authResult ->
+                val user = authResult.user
+                if(user == null){
+                    onResult(false, "No se pudo obtener el usuairo")
+                    return@addOnSuccessListener
+                }
+
+                userName = user.displayName ?: user.email?.substringBefore("@") ?: "Usuario"
+                email = user.email ?: ""
+
+                val ref = db.collection("users").document(user.uid)
+                ref.get().addOnSuccessListener {
+                    doc ->
+                    if(!doc.exists()){
+                        ref.set(
+                            hashMapOf(
+                                "Nombre(s)" to (user.displayName?: ""),
+                                "email" to (user.email ?: ""),
+                                "uid" to user.uid
+                            )
+                        ).addOnFailureListener {
+                            Log.w("GoogleLogin", "No se pudo guardar en Firestore",it)
+                        }
+                    }
+                }
+                onResult(true, null)
+            }
+            .addOnFailureListener { e->
+                onResult(false, e.localizedMessage)
+            }
+    }
+    suspend fun signInWithGoogleCredential(activity: Activity, webClientId: String): String?{
+        val credentialManager = CredentialManager.create(activity)
+
+        // Configuración para cuentas autorizadas
+        val googleOption = GetSignInWithGoogleOption.Builder(webClientId)
+            .build()
+        val request = GetCredentialRequest.Builder()
+            .addCredentialOption(googleOption)
+            .build()
+        return try{
+            //solicitud de credenciales
+            val result = credentialManager.getCredential(
+                request = request,
+                context = activity
+            )
+            //token id de google
+            handleCredentialResult(result)
+        }catch (e: GetCredentialException){
+            // Imprime el tipo exacto de error en el Logcat para depurar
+            android.util.Log.e("AuthError", "Error tipo: ${e.type}, Mensaje: ${e.message}")
+            null
+        }
+    }
+    fun handleCredentialResult(result: GetCredentialResponse): String? {
+        val credential = result.credential
+        return when(credential){
+            is CustomCredential ->{
+                if(credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL){
+                    try {
+                        val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(credential.data)
+                        val googleIdToken = googleIdTokenCredential.idToken
+
+                        googleIdToken
+                    }catch (e: GoogleIdTokenParsingException){
+                        null
+                    }
+                }else{
+                    null
+                }
+            }
+            else -> null
+        }
+    }
+    //FIN DE LOS METODOS DEL LOGIN
+    //LOGOUT
+    fun logout(context: Context, onFinished: ()->Unit){
+        auth.signOut()
+        userName =""
+        email = ""
+
+        viewModelScope.launch {
+            try {
+                CredentialManager.create(context.applicationContext)
+                    .clearCredentialState(ClearCredentialStateRequest())
+            }catch (e: Exception){
+                Log.w("Logout","No se puede limpiar el estado de credenciales",e)
+            }
+        }
+    }
     fun select(id: Int) {
         selectedRouteId = id
         learnedMessage = null
