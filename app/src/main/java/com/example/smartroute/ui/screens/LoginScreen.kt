@@ -2,6 +2,10 @@ package com.example.smartroute.ui.screens
 
 import android.app.Activity
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.common.api.ApiException
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -57,6 +61,52 @@ fun LoginScreen(
     val context = LocalContext.current
     val activity = context as? Activity
     val scope = rememberCoroutineScope()
+
+    val googleLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
+        try {
+            val account = task.getResult(ApiException::class.java)
+            val idToken = account.idToken
+            if (idToken != null) {
+                isLoading = true
+                error = null
+                vm.loginWithGoogle(idToken) { ok, err ->
+                    isLoading = false
+                    if (ok) {
+                        Toast.makeText(context, "¡Sesión iniciada con Google correctamente!", Toast.LENGTH_SHORT).show()
+                        onLoggedIn()
+                    } else {
+                        val fullErr = err ?: "Fallo al iniciar sesión con Google en Firebase."
+                        error = fullErr
+                        Toast.makeText(context, fullErr, Toast.LENGTH_LONG).show()
+                    }
+                }
+            } else {
+                isLoading = false
+                val msg = "No se pudo obtener la credencial de la cuenta de Google seleccionada."
+                error = msg
+                Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+            }
+        } catch (e: ApiException) {
+            isLoading = false
+            val friendly = when (e.statusCode) {
+                10 -> "[Código 10: DEVELOPER_ERROR] La huella SHA-1 de esta máquina no coincide con Firebase Console para com.example.smartroute."
+                7 -> "[Código 7: NETWORK_ERROR] Error de conexión a internet o servicios de Google inaccesibles."
+                12500 -> "[Código 12500: SIGN_IN_FAILED] Proveedor Google no habilitado en Firebase Authentication."
+                12501, 16 -> "Inicio de sesión cancelado."
+                else -> "[Código ${e.statusCode}] ${e.localizedMessage ?: "Error en Google Play Services"}"
+            }
+            error = friendly
+            Toast.makeText(context, friendly, Toast.LENGTH_LONG).show()
+        } catch (e: Exception) {
+            isLoading = false
+            val msg = e.localizedMessage ?: "Error inesperado al conectar con Google."
+            error = msg
+            Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+        }
+    }
 
     Column(
         Modifier
@@ -222,10 +272,23 @@ fun LoginScreen(
                             }
                         },
                         onFailure = { ex ->
-                            isLoading = false
-                            val exactMsg = ex.message ?: "Error al autenticar con Google."
-                            error = exactMsg
-                            Toast.makeText(context, exactMsg, Toast.LENGTH_LONG).show()
+                            val isNoCredential = ex.message?.contains("NoCredentialException", ignoreCase = true) == true
+                            if (isNoCredential) {
+                                // Fallback inteligente: si CredentialManager no detecta cuentas registradas para esta firma,
+                                // abrimos el selector nativo clásico de Google Play Services con opción de agregar cuenta
+                                try {
+                                    val client = vm.getGoogleSignInClient(activity)
+                                    googleLauncher.launch(client.signInIntent)
+                                } catch (e: Exception) {
+                                    isLoading = false
+                                    error = "Fallo al abrir selector clásico de Google: ${e.localizedMessage}"
+                                }
+                            } else {
+                                isLoading = false
+                                val exactMsg = ex.message ?: "Error al autenticar con Google."
+                                error = exactMsg
+                                Toast.makeText(context, exactMsg, Toast.LENGTH_LONG).show()
+                            }
                         }
                     )
                 }

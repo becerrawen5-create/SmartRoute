@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "927563966222-46ifhn36nkvn0o50q5reqd8u42teokpc.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.smartroute",
+            "certificate_hash": "b3113fe238eb14d6a467b4d0ade88051327b3ae9"
+          }
+        },
+        {
           "client_id": "927563966222-jv3me4gieem3rbci6dhklfcg0ebtip3r.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
