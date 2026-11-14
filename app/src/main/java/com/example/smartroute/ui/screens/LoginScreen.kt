@@ -2,6 +2,8 @@ package com.example.smartroute.ui.screens
 
 import android.app.Activity
 import android.widget.Toast
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -9,13 +11,17 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -29,20 +35,28 @@ import com.example.smartroute.ui.components.BrandText
 import com.example.smartroute.ui.components.SmartLogo
 import com.example.smartroute.ui.components.StatusBarStyle
 import com.example.smartroute.ui.theme.*
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.auth.GoogleAuthProvider
-import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.launch
 
 @Composable
-fun LoginScreen(vm: SmartRouteViewModel, onLoggedIn: () -> Unit, onNavigateToRegister: () -> Unit) {
+fun LoginScreen(
+    vm: SmartRouteViewModel,
+    onLoggedIn: () -> Unit,
+    onNavigateToRegister: () -> Unit
+) {
     StatusBarStyle(darkIcons = true)
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var rememberMe by remember { mutableStateOf(true) }
     var showPass by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    var infoMessage by remember { mutableStateOf<String?>(null) }
+    var showResetDialog by remember { mutableStateOf(false) }
+    var resetEmail by remember { mutableStateOf("") }
+    var isLoading by remember { mutableStateOf(false) }
+
+    val context = LocalContext.current
+    val activity = context as? Activity
+    val scope = rememberCoroutineScope()
 
     Column(
         Modifier
@@ -90,61 +104,188 @@ fun LoginScreen(vm: SmartRouteViewModel, onLoggedIn: () -> Unit, onNavigateToReg
             Checkbox(checked = rememberMe, onCheckedChange = { rememberMe = it })
             Text("Recordarme", fontSize = 13.sp)
             Spacer(Modifier.weight(1f))
-            TextButton(onClick = { }) { Text("¿Olvidaste tu contraseña?", fontSize = 12.sp) }
+            TextButton(onClick = {
+                resetEmail = email
+                showResetDialog = true
+            }) { Text("¿Olvidaste tu contraseña?", fontSize = 12.sp) }
         }
-        error?.let {
-            Text(it, color = Danger, fontSize = 13.sp, modifier = Modifier.padding(bottom = 8.dp))
+
+        // Alerta visual de error con detalles exactos de Firebase / Google
+        error?.let { errorMsg ->
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp),
+                colors = CardDefaults.cardColors(containerColor = Danger.copy(alpha = 0.08f)),
+                shape = RoundedCornerShape(12.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Danger.copy(alpha = 0.4f))
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.Top
+                ) {
+                    Icon(
+                        Icons.Filled.Warning,
+                        contentDescription = "Error",
+                        tint = Danger,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Column {
+                        Text(
+                            text = "Detalle del error:",
+                            color = Danger,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp
+                        )
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            text = errorMsg,
+                            color = Danger,
+                            fontSize = 12.sp,
+                            lineHeight = 16.sp
+                        )
+                    }
+                }
+            }
         }
+
+        infoMessage?.let {
+            Text(it, color = Success, fontSize = 13.sp, modifier = Modifier.padding(bottom = 8.dp))
+        }
+
         Button(
             onClick = {
-                if(email.isBlank() || password.isBlank()){
-                    error = "Rellena los campos por favor"
+                if (email.isBlank() || password.isBlank()) {
+                    error = "Por favor completa todos los campos"
                     return@Button
-                }else{
-                    vm.loginWithAuth(email, password){ exito, mensajeError ->
-                        if (exito){
+                } else {
+                    isLoading = true
+                    error = null
+                    vm.loginWithAuth(email, password) { exito, mensajeError ->
+                        isLoading = false
+                        if (exito) {
+                            Toast.makeText(context, "¡Bienvenido a SmartRoute!", Toast.LENGTH_SHORT).show()
                             onLoggedIn()
-                        }else{
+                        } else {
                             error = mensajeError ?: "Correo o contraseña incorrectos"
+                            Toast.makeText(context, error, Toast.LENGTH_LONG).show()
                         }
                     }
                 }
             },
             modifier = Modifier.fillMaxWidth().height(50.dp),
-            shape = RoundedCornerShape(12.dp)
-        ) { Text("Iniciar sesión", fontWeight = FontWeight.Bold) }
+            shape = RoundedCornerShape(12.dp),
+            enabled = !isLoading
+        ) {
+            if (isLoading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(22.dp),
+                    strokeWidth = 2.dp,
+                    color = MaterialTheme.colorScheme.onPrimary
+                )
+            } else {
+                Text("Iniciar sesión", fontWeight = FontWeight.Bold)
+            }
+        }
 
         Spacer(Modifier.height(16.dp))
         Text("o continúa con", color = Muted, fontSize = 12.sp)
         Spacer(Modifier.height(12.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            val context = LocalContext.current
-            val activity = context as? Activity
-            val scope = rememberCoroutineScope()
-            OutlinedButton(onClick ={
-                if(activity!=null){
-                    scope.launch {
-                        val idToken = vm.signInWithGoogleCredential(
-                            activity = activity,
-                            webClientId = "927563966222-3ph7vlbe8npfugkuj0kqskr3adrkpm1b.apps.googleusercontent.com"
-                        )
-                        if(idToken!=null){
-                            vm.loginWithGoogle(idToken){
-                                ok, error->
-                                if(ok)onLoggedIn()
-                                else android.util.Log.e("AuthError", "Fallo login con Google: $error")
-                            }
-                        }
-                    }
+
+        // Botón de autenticación con Google y Firebase Credential Manager
+        OutlinedButton(
+            onClick = {
+                if (activity == null) {
+                    val msg = "No se pudo acceder a la actividad para iniciar sesión con Google."
+                    error = msg
+                    Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                    return@OutlinedButton
                 }
-            } ,
-                modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp)) {
-                Text("Google")
+
+                scope.launch {
+                    isLoading = true
+                    error = null
+                    val authResult = vm.signInWithGoogleCredential(activity)
+                    authResult.fold(
+                        onSuccess = { idToken ->
+                            vm.loginWithGoogle(idToken) { ok, err ->
+                                isLoading = false
+                                if (ok) {
+                                    Toast.makeText(context, "¡Sesión iniciada con Google correctamente!", Toast.LENGTH_SHORT).show()
+                                    onLoggedIn()
+                                } else {
+                                    val fullErr = err ?: "Fallo al iniciar sesión con Google en Firebase."
+                                    error = fullErr
+                                    Toast.makeText(context, fullErr, Toast.LENGTH_LONG).show()
+                                }
+                            }
+                        },
+                        onFailure = { ex ->
+                            isLoading = false
+                            val exactMsg = ex.message ?: "Error al autenticar con Google."
+                            error = exactMsg
+                            Toast.makeText(context, exactMsg, Toast.LENGTH_LONG).show()
+                        }
+                    )
+                }
+            },
+            modifier = Modifier.fillMaxWidth().height(50.dp),
+            shape = RoundedCornerShape(12.dp),
+            enabled = !isLoading
+        ) {
+            if (isLoading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(20.dp),
+                    strokeWidth = 2.dp,
+                    color = Blue900
+                )
+                Spacer(Modifier.width(8.dp))
+                Text("Conectando con Google...", fontWeight = FontWeight.SemiBold)
+            } else {
+                Text("Continuar con Google", fontWeight = FontWeight.SemiBold)
             }
         }
+
         Spacer(Modifier.height(24.dp))
         TextButton(onClick = onNavigateToRegister) {
-            Text("¿No tienes una cuenta? Registrate", color = Blue900, fontSize = 13.sp, textAlign = TextAlign.Center)
+            Text("¿No tienes una cuenta? Regístrate", color = Blue900, fontSize = 13.sp, textAlign = TextAlign.Center)
         }
+    }
+
+    if (showResetDialog) {
+        AlertDialog(
+            onDismissRequest = { showResetDialog = false },
+            title = { Text("Recuperar contraseña") },
+            text = {
+                Column {
+                    Text("Ingresa tu correo para enviarte las instrucciones de restablecimiento.")
+                    Spacer(Modifier.height(10.dp))
+                    OutlinedTextField(
+                        value = resetEmail,
+                        onValueChange = { resetEmail = it },
+                        label = { Text("Correo electrónico") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(onClick = {
+                    showResetDialog = false
+                    vm.sendPasswordReset(resetEmail) { ok, msg ->
+                        if (ok) infoMessage = msg else error = msg
+                        Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                    }
+                }) {
+                    Text("Enviar")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showResetDialog = false }) {
+                    Text("Cancelar")
+                }
+            }
+        )
     }
 }

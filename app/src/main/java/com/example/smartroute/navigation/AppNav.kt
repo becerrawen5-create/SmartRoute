@@ -86,7 +86,19 @@ fun SmartRouteApp(vm: SmartRouteViewModel = viewModel()) {
             modifier = Modifier.padding(padding)
         ) {
             composable(Dest.SPLASH) {
-                SplashScreen(onStart = { nav.navigate(Dest.LOGIN) })
+                SplashScreen(
+                    vm = vm,
+                    onNavigateToHome = {
+                        nav.navigate(Dest.HOME) {
+                            popUpTo(Dest.SPLASH) { inclusive = true }
+                        }
+                    },
+                    onNavigateToLogin = {
+                        nav.navigate(Dest.LOGIN) {
+                            popUpTo(Dest.SPLASH) { inclusive = true }
+                        }
+                    }
+                )
             }
             composable(Dest.LOGIN) {
                 LoginScreen(
@@ -124,7 +136,8 @@ fun SmartRouteApp(vm: SmartRouteViewModel = viewModel()) {
                     onOpenRoute = { id ->
                         vm.select(id)
                         nav.navigate(Dest.DETAIL)
-                    }
+                    },
+                    onOpenProfile = { nav.navigate(Dest.PROFILE) }
                 )
             }
             composable(Dest.MAP) {

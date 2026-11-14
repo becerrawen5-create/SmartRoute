@@ -1,5 +1,6 @@
 package com.example.smartroute.ui.screens
 
+import android.widget.Toast
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -47,7 +48,6 @@ import com.example.smartroute.ui.components.StatusBarStyle
 import com.example.smartroute.ui.theme.Blue900
 import com.example.smartroute.ui.theme.Danger
 import com.example.smartroute.ui.theme.Ink
-import java.nio.file.WatchEvent
 
 @Composable
 fun RegisterScreen(
@@ -56,6 +56,7 @@ fun RegisterScreen(
     onBackToLogin:()-> Unit
 ) {
     StatusBarStyle(darkIcons = true)
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     var nombre by remember { mutableStateOf("") }
     var apellidoPaterno by remember { mutableStateOf("") }
@@ -125,7 +126,7 @@ fun RegisterScreen(
         OutlinedTextField(
             value = password,
             onValueChange = {
-                if(it.length<=12){
+                if (it.length <= 64) {
                     password = it
                     error = null
                 }
@@ -133,18 +134,15 @@ fun RegisterScreen(
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             shape = RoundedCornerShape(12.dp),
-            placeholder = {Text("Contraseña")},
+            placeholder = { Text("Contraseña") },
             leadingIcon = { Icon(Icons.Filled.Lock, null) },
             trailingIcon = {
-                IconButton(onClick = {showPass = !showPass}) {
+                IconButton(onClick = { showPass = !showPass }) {
                     Icon(if (showPass) Icons.Filled.VisibilityOff else Icons.Filled.Visibility, "Mostrar contraseña")
                 }
             },
-
             visualTransformation = if (showPass) VisualTransformation.None else PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
-
-
         )
         Spacer(Modifier.height(20.dp))
 
@@ -168,7 +166,7 @@ fun RegisterScreen(
                 vm.registerWithAuth(nombre, apellidoPaterno, apellidoMaterno, email, password) { exito, mensajeError ->
                     isLoading = false
                     if (exito) {
-                        error = "¡Registro exitoso! Revisa tu correo para verificar tu cuenta."
+                        Toast.makeText(context, "¡Cuenta creada exitosamente! Bienvenido a SmartRoute", Toast.LENGTH_LONG).show()
                         onRegistered()
                     } else {
                         error = mensajeError ?: "Error al registrar el usuario"

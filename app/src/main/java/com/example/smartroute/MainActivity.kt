@@ -6,21 +6,19 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import com.example.smartroute.navigation.SmartRouteApp
 import com.example.smartroute.ui.theme.SmartRouteTheme
-// IMPORTA ESTO:
 import org.osmdroid.config.Configuration
+import java.io.File
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        // En MainActivity.kt onCreate()
-        Configuration.getInstance().apply {
-            // Usa el nombre del paquete o un string identificable
-            userAgentValue = "com.example.smartroute"
-            osmdroidBasePath = cacheDir
-            osmdroidTileCache = java.io.File(cacheDir, "osmdroid-tiles").apply { mkdirs() }
-        }
+        // 1. Configuración temprana de osmdroid con User-Agent único y caché dedicada antes de instanciar MapView
+        val osmConfig = Configuration.getInstance()
+        osmConfig.userAgentValue = "$packageName/1.0 (Android App; SmartRoute AI)"
+        osmConfig.osmdroidBasePath = File(cacheDir, "osmdroid")
+        osmConfig.osmdroidTileCache = File(osmConfig.osmdroidBasePath, "tiles")
 
         setContent {
             SmartRouteTheme {
