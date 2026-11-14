@@ -22,17 +22,21 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.smartroute.R
+import com.example.smartroute.SmartRouteViewModel
 import com.example.smartroute.ui.components.StatusBarStyle
 import com.example.smartroute.ui.theme.Ink
 import com.example.smartroute.ui.theme.Yellow
 
 @Composable
-fun SplashScreen(onStart: () -> Unit) {
+fun SplashScreen(
+    vm: SmartRouteViewModel,
+    onNavigateToHome: () -> Unit,
+    onNavigateToLogin: () -> Unit
+) {
     StatusBarStyle(darkIcons = false)
+    val hasSession = vm.auth.currentUser != null
 
     Box(modifier = Modifier.fillMaxSize()) {
-
-
         Image(
             painter = painterResource(id = R.drawable.smartroute_background),
             contentDescription = null,
@@ -49,18 +53,29 @@ fun SplashScreen(onStart: () -> Unit) {
             verticalArrangement = Arrangement.Bottom
         ) {
             Button(
-                onClick = onStart,
+                onClick = {
+                    if (hasSession) {
+                        onNavigateToHome()
+                    } else {
+                        onNavigateToLogin()
+                    }
+                },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(52.dp)
-                    .padding(bottom = 0.dp),
+                    .height(52.dp),
                 shape = RoundedCornerShape(14.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = Yellow,
                     contentColor = Ink
                 )
             ) {
-                Text("Comenzar", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                val label = if (hasSession) {
+                    val name = vm.userName.ifBlank { "Usuario" }.substringBefore(' ')
+                    "Continuar como $name"
+                } else {
+                    "Comenzar"
+                }
+                Text(label, fontWeight = FontWeight.Bold, fontSize = 16.sp)
             }
         }
     }

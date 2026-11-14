@@ -7,6 +7,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -14,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.smartroute.SmartRouteViewModel
@@ -52,7 +55,7 @@ fun HistoryScreen(vm: SmartRouteViewModel) {
                         .background(if (selected) Blue600 else AppBg)
                         .clickable { filter = i }
                         .padding(vertical = 10.dp),
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    textAlign = TextAlign.Center
                 )
             }
         }
@@ -63,42 +66,59 @@ fun HistoryScreen(vm: SmartRouteViewModel) {
             val km = vm.history.sumOf { it.km }
             val avg = if (total > 0) vm.history.sumOf { it.minutes } / total else 0
             val top = RecommendationEngine.mostFrequentRoute(vm.history)
-            StatCard("Recorridos", "$total")
-            StatCard("Distancia total", "${"%.1f".format(km)} km")
-            StatCard("Duración promedio", "$avg min")
-            StatCard("Ruta más frecuente", top?.let { "${it.first} (${it.second}x)" } ?: "—")
-            StatCard("Adaptaciones aceptadas", "${vm.acceptedAdaptations}")
+            StatCard("Recorridos registrados", "$total")
+            StatCard("Distancia total recorrida", "${"%.1f".format(km)} km")
+            StatCard("Duración promedio de viaje", "$avg min")
+            StatCard("Ruta más frecuente", top?.let { "${it.first} (${it.second}x)" } ?: "Sin datos aún")
+            StatCard("Adaptaciones aceptadas por IA", "${vm.acceptedAdaptations}")
         } else {
             val list = vm.history.filter { filter == 0 || it.title in favoriteTitles }
             if (list.isEmpty()) {
-                Text("No hay recorridos para mostrar.", color = Muted)
-            }
-            list.groupBy { it.day }.forEach { (day, entries) ->
-                Text(day, color = Muted, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                Spacer(Modifier.height(6.dp))
-                entries.forEach { e ->
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 8.dp)
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(AppBg)
-                            .padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                AppCard(Modifier.fillMaxWidth().padding(top = 12.dp)) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Box(
-                            Modifier.size(40.dp).clip(CircleShape).background(Blue100),
-                            contentAlignment = Alignment.Center
-                        ) { Icon(e.transport.icon, null, tint = Blue600) }
-                        Spacer(Modifier.width(12.dp))
-                        Column(Modifier.weight(1f)) {
-                            Text(e.title, fontWeight = FontWeight.SemiBold, color = Ink, fontSize = 14.sp)
-                            Text("${e.minutes} min · ${"%.1f".format(e.km)} km", color = Muted, fontSize = 12.sp)
-                        }
-                        Text(e.time, color = Muted, fontSize = 12.sp)
+                        Icon(Icons.Filled.History, null, tint = Blue600, modifier = Modifier.size(44.dp))
+                        Spacer(Modifier.height(10.dp))
+                        Text("Sin registros disponibles", fontWeight = FontWeight.Bold, color = Ink, fontSize = 16.sp)
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "Tu cuenta no tiene recorridos en la base de datos para este filtro. Navega en una ruta para registrar tu actividad.",
+                            color = Muted,
+                            fontSize = 12.sp,
+                            textAlign = TextAlign.Center
+                        )
                     }
                 }
-                Spacer(Modifier.height(8.dp))
+            } else {
+                list.groupBy { it.day }.forEach { (day, entries) ->
+                    Text(day, color = Muted, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                    Spacer(Modifier.height(6.dp))
+                    entries.forEach { e ->
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 8.dp)
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(AppBg)
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                Modifier.size(40.dp).clip(CircleShape).background(Blue100),
+                                contentAlignment = Alignment.Center
+                            ) { Icon(e.transport.icon, null, tint = Blue600) }
+                            Spacer(Modifier.width(12.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(e.title, fontWeight = FontWeight.SemiBold, color = Ink, fontSize = 14.sp)
+                                Text("${e.minutes} min · ${"%.1f".format(e.km)} km", color = Muted, fontSize = 12.sp)
+                            }
+                            Text(e.time, color = Muted, fontSize = 12.sp)
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                }
             }
         }
     }

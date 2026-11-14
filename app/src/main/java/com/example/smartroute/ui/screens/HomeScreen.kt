@@ -30,12 +30,24 @@ fun HomeScreen(
     onOpenWeather: () -> Unit,
     onOpenTraffic: () -> Unit,
     onOpenFavorites: () -> Unit,
-    onOpenRoute: (Int) -> Unit
+    onOpenRoute: (Int) -> Unit,
+    onOpenProfile: () -> Unit = {}
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     StatusBarStyle(darkIcons = false)
     val route = vm.featuredRoute
-    val rec = vm.recommendationFor(route)
+    val rec = route?.let { vm.recommendationFor(it) }
     val w = vm.weather
+
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        vm.initLocation(context)
+    }
+
+    androidx.compose.runtime.LaunchedEffect(route?.id, vm.currentUserLocation) {
+        val lat = route?.startLat ?: vm.currentUserLocation?.latitude ?: 19.432608
+        val lng = route?.startLng ?: vm.currentUserLocation?.longitude ?: -99.133209
+        vm.fetchWeatherForCoordinates(context, lat, lng, route?.from)
+    }
 
     Column(
         Modifier
@@ -45,13 +57,18 @@ fun HomeScreen(
     ) {
         GradientHeader {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Filled.Menu, null, tint = Color.White)
+                IconButton(onClick = onOpenProfile) {
+                    Icon(Icons.Filled.Menu, "Menú", tint = Color.White)
+                }
                 Spacer(Modifier.weight(1f))
-                Icon(Icons.Filled.Place, null, tint = Yellow)
+                IconButton(onClick = onOpenProfile) {
+                    Icon(Icons.Filled.Person, "Perfil", tint = Yellow)
+                }
             }
             Spacer(Modifier.height(8.dp))
+            val displayName = vm.userName.ifBlank { "Usuario" }.substringBefore(' ')
             Text(
-                "Hola, ${vm.userName.substringBefore(' ')} 👋",
+                "Hola, $displayName 👋",
                 color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Bold
             )
             Text("¿A dónde vamos hoy?", color = Color.White.copy(alpha = 0.85f))
@@ -81,29 +98,58 @@ fun HomeScreen(
             QuickAction(Icons.Filled.Star, "Favoritos", "Tus rutas", Warning, Color(0xFFFFF1CC), onOpenFavorites, Modifier.weight(1f))
         }
 
-        AppCard(Modifier.padding(horizontal = 16.dp).fillMaxWidth()) {
-            Text("Tu ruta recomendada", fontWeight = FontWeight.Bold, color = Ink)
-            Text("Basada en tu historial y condiciones actuales", color = Muted, fontSize = 12.sp)
-            Spacer(Modifier.height(12.dp))
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(AppBg)
-                    .padding(12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Text(route.title, fontWeight = FontWeight.SemiBold, color = Ink)
-                    Text("${rec.adaptedMinutes} min · ${"%.1f".format(route.km)} km", color = Muted, fontSize = 12.sp)
+        if (route != null && rec != null) {
+            AppCard(Modifier.padding(horizontal = 16.dp).fillMaxWidth()) {
+                Text("Tu ruta recomendada", fontWeight = FontWeight.Bold, color = Ink)
+                Text("Basada en tu historial y condiciones actuales", color = Muted, fontSize = 12.sp)
+                Spacer(Modifier.height(12.dp))
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(AppBg)
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(route.title, fontWeight = FontWeight.SemiBold, color = Ink)
+                        Text("${rec.adaptedMinutes} min · ${"%.1f".format(route.km)} km", color = Muted, fontSize = 12.sp)
+                    }
+                    Button(onClick = { onOpenRoute(route.id) }, shape = RoundedCornerShape(50)) {
+                        Text("Ver ruta", fontSize = 13.sp)
+                    }
                 }
-                Button(onClick = { onOpenRoute(route.id) }, shape = RoundedCornerShape(50)) {
-                    Text("Ver ruta", fontSize = 13.sp)
+                Spacer(Modifier.height(10.dp))
+                Text(rec.title, color = Blue600, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                Text(rec.reason, color = Muted, fontSize = 12.sp)
+            }
+        } else {
+            AppCard(Modifier.padding(horizontal = 16.dp).fillMaxWidth()) {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(Icons.Filled.Directions, null, tint = Blue600, modifier = Modifier.size(40.dp))
+                    Spacer(Modifier.height(8.dp))
+                    Text("Sin rutas registradas en tu cuenta", fontWeight = FontWeight.Bold, color = Ink, fontSize = 15.sp)
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "Crea tu primera ruta habitual para que la IA la adapte automáticamente con base en el clima, tráfico y tus dispositivos IoT.",
+                        color = Muted,
+                        fontSize = 12.sp,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(Modifier.height(14.dp))
+                    Button(
+                        onClick = onOpenFavorites,
+                        shape = RoundedCornerShape(50)
+                    ) {
+                        Icon(Icons.Filled.Add, null)
+                        Spacer(Modifier.width(6.dp))
+                        Text("Añadir mi primera ruta", fontSize = 13.sp)
+                    }
                 }
             }
-            Spacer(Modifier.height(10.dp))
-            Text(rec.title, color = Blue600, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-            Text(rec.reason, color = Muted, fontSize = 12.sp)
         }
 
         Spacer(Modifier.height(14.dp))
@@ -119,7 +165,7 @@ fun HomeScreen(
                 }
                 Column(horizontalAlignment = Alignment.End) {
                     Text("Lluvia ${w.rainChance}%", fontSize = 12.sp, color = Ink)
-                    Text("Tráfico ${route.traffic.label}", fontSize = 12.sp, color = Ink)
+                    Text("Tráfico ${route?.traffic?.label ?: "Fluido"}", fontSize = 12.sp, color = Ink)
                     Text("Aire ${w.airQuality}", fontSize = 12.sp, color = Ink)
                 }
             }

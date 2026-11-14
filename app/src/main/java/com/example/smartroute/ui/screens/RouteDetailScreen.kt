@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.smartroute.SmartRouteViewModel
@@ -24,6 +25,35 @@ import com.example.smartroute.ui.theme.*
 fun RouteDetailScreen(vm: SmartRouteViewModel, onBack: () -> Unit, onOpenMap: () -> Unit) {
     StatusBarStyle(darkIcons = false)
     val route = vm.selectedRoute
+
+    if (route == null) {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .background(AppBg)
+                .statusBarsPadding()
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Icon(Icons.Filled.Directions, null, tint = Blue600, modifier = Modifier.size(56.dp))
+            Spacer(Modifier.height(16.dp))
+            Text("Sin registros disponibles", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Ink)
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "No hay ninguna ruta seleccionada o tu cuenta no tiene rutas registradas aún.",
+                color = Muted,
+                fontSize = 13.sp,
+                textAlign = TextAlign.Center
+            )
+            Spacer(Modifier.height(20.dp))
+            Button(onClick = onBack, shape = RoundedCornerShape(50)) {
+                Text("Volver")
+            }
+        }
+        return
+    }
+
     val rec = vm.recommendationFor(route)
     var tab by remember { mutableIntStateOf(0) }
     var showDeleteDialog by remember { mutableStateOf(false) }
@@ -79,7 +109,7 @@ fun RouteDetailScreen(vm: SmartRouteViewModel, onBack: () -> Unit, onOpenMap: ()
                 AlternativeCard(
                     "Ruta habitual",
                     "${rec.habitualMinutes} min",
-                    "La que sueles utilizar.",
+                    "Ruta histórica registrada.",
                     highlight = false
                 ) {
                     OutlinedButton(onClick = { vm.keepHabitual() }) { Text("Elegir") }
@@ -94,7 +124,7 @@ fun RouteDetailScreen(vm: SmartRouteViewModel, onBack: () -> Unit, onOpenMap: ()
                     Button(onClick = { vm.acceptAdaptation() }) { Text("Elegir") }
                 }
                 Spacer(Modifier.height(10.dp))
-                Text("Confianza de la IA: ${vm.recommendationFor(route).confidence}%", color = Muted, fontSize = 12.sp)
+                Text("Confianza de la IA: ${rec.confidence}%", color = Muted, fontSize = 12.sp)
                 vm.learnedMessage?.let {
                     Spacer(Modifier.height(6.dp))
                     Text(it, color = Success, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
@@ -137,25 +167,22 @@ fun RouteDetailScreen(vm: SmartRouteViewModel, onBack: () -> Unit, onOpenMap: ()
         }
         Spacer(Modifier.height(8.dp))
     }
+
     if (showDeleteDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
             icon = { Icon(Icons.Filled.Delete, null, tint = Danger) },
             title = { Text("Eliminar ruta") },
             text = {
-                if (vm.routes.size <= 1) {
-                    Text("Debe existir al menos una ruta guardada. Crea una nueva antes de eliminar esta.")
-                } else {
-                    Text("¿Seguro que quieres eliminar \"${route.title}\"? Esta acción no se puede deshacer.")
-                }
+                Text("¿Seguro que quieres eliminar \"${route.title}\"? Se borrará permanentemente de tu base de datos.")
             },
             confirmButton = {
                 TextButton(
                     onClick = {
                         showDeleteDialog = false
-                        if (vm.deleteRoute(route.id)) onBack()
+                        vm.deleteRoute(route.id)
+                        onBack()
                     },
-                    enabled = vm.routes.size > 1,
                     colors = ButtonDefaults.textButtonColors(contentColor = Danger)
                 ) { Text("Eliminar") }
             },

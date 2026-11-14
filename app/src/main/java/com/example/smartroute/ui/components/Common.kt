@@ -1,7 +1,11 @@
 package com.example.smartroute.ui.components
 
-
+import android.Manifest
 import android.app.Activity
+import android.content.pm.PackageManager
+import android.graphics.Paint
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -11,8 +15,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -24,6 +27,8 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -33,46 +38,79 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import com.example.smartroute.data.TrafficLevel
 import com.example.smartroute.ui.theme.*
-import androidx.compose.ui.viewinterop.AndroidView
-import org.osmdroid.tileprovider.tilesource.XYTileSource
+import org.osmdroid.events.MapEventsReceiver
+import org.osmdroid.tileprovider.tilesource.OnlineTileSourceBase
+import org.osmdroid.util.BoundingBox
 import org.osmdroid.util.GeoPoint
+import org.osmdroid.util.MapTileIndex
+import org.osmdroid.views.CustomZoomButtonsController
 import org.osmdroid.views.MapView
-import android.Manifest
-import android.content.pm.PackageManager
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.ui.platform.LocalContext
-import androidx.core.content.ContextCompat
+import org.osmdroid.views.overlay.MapEventsOverlay
+import org.osmdroid.views.overlay.Marker
+import org.osmdroid.views.overlay.Polyline
 import org.osmdroid.views.overlay.mylocation.GpsMyLocationProvider
 import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
+
+/**
+ * Proveedor de Tiles público de Esri World Street Map.
+ * Rápido, nítido, sin marcas de agua, sin API Key y gratuito.
+ * Formato de URL de ArcGIS: {baseUrl}/{z}/{y}/{x}
+ */
+val EsriWorldStreetMapTileSource = object : OnlineTileSourceBase(
+    "EsriWorldStreetMap",
+    0,
+    19,
+    256,
+    ".jpg",
+    arrayOf("https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/")
+) {
+    override fun getTileURLString(pMapTileIndex: Long): String {
+        return baseUrl +
+                MapTileIndex.getZoom(pMapTileIndex) + "/" +
+                MapTileIndex.getY(pMapTileIndex) + "/" +
+                MapTileIndex.getX(pMapTileIndex)
+    }
+}
 
 @Composable
 fun RealMap(
     modifier: Modifier = Modifier,
-    initialLat: Double = 19.4326,
-    initialLng: Double = -99.1332,
-    initialZoom: Double = 14.0
+    startPoint: GeoPoint? = null,
+    endPoint: GeoPoint? = null,
+    startLabel: String = "Origen",
+    endLabel: String = "Destino",
+    routePoints: List<GeoPoint> = emptyList(),
+    polylineColor: Color = Blue600,
+    userLocation: GeoPoint? = null,
+    showControls: Boolean = true,
+    isStartDraggable: Boolean = false,
+    onStartDragEnd: ((GeoPoint) -> Unit)? = null,
+    isEndDraggable: Boolean = false,
+    onEndDragEnd: ((GeoPoint) -> Unit)? = null,
+    onMapClick: ((GeoPoint) -> Unit)? = null
 ) {
     val context = LocalContext.current
-
-    // 1. Lanzador para pedir permisos de ubicación
-    val permissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestMultiplePermissions()
-    ) { permissions ->
-        // Aquí podríamos reaccionar si el usuario acepta o deniega
+    var hasLocationPermission by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        )
     }
 
-    // 2. Pedir el permiso automáticamente al abrir la pantalla
-    LaunchedEffect(Unit) {
-        val fineLocation = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
-        val coarseLocation = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION)
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { perms ->
+        hasLocationPermission = perms[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+                perms[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+    }
 
-        if (fineLocation != PackageManager.PERMISSION_GRANTED && coarseLocation != PackageManager.PERMISSION_GRANTED) {
+    LaunchedEffect(Unit) {
+        if (!hasLocationPermission) {
             permissionLauncher.launch(
                 arrayOf(
                     Manifest.permission.ACCESS_FINE_LOCATION,
@@ -82,47 +120,156 @@ fun RealMap(
         }
     }
 
-    AndroidView(
-        modifier = modifier,
-        factory = { ctx ->
-            MapView(ctx).apply {
-                // Fuente personalizada que ya te funcionó
-                val customTileSource = XYTileSource(
-                    "OSM_FR",
-                    1, 20, 256, ".png",
-                    arrayOf(
-                        "https://a.tile.openstreetmap.fr/hot/",
-                        "https://b.tile.openstreetmap.fr/hot/",
-                        "https://c.tile.openstreetmap.fr/hot/"
-                    ),
-                    "© OpenStreetMap contributors"
-                )
-                setTileSource(customTileSource)
-
-                setBuiltInZoomControls(true)
-                setMultiTouchControls(true)
-                controller.setZoom(initialZoom)
-                controller.setCenter(GeoPoint(initialLat, initialLng))
-
-                // 3. Agregar el Punto Azul de Ubicación Real
-                val locationOverlay = MyLocationNewOverlay(GpsMyLocationProvider(ctx), this)
-                locationOverlay.enableMyLocation() // Activa el GPS
-                locationOverlay.enableFollowLocation() // Centra el mapa en tu ubicación al abrir
-                overlays.add(locationOverlay)
-            }
-        },
-        update = { mapView ->
-            mapView.invalidate()
-        }
-    )
-
-    // 4. (Opcional pero recomendado) Pausar el GPS si el usuario sale de la pantalla para no gastar batería
-    DisposableEffect(Unit) {
-        onDispose {
-            // Aquí podríamos detener el overlay si guardáramos la referencia,
-            // pero para fines de este proyecto, Android lo manejará al destruir la vista.
+    // Instancia de MapView de osmdroid usando Esri World Street Map (sin marcas de agua ni API Key)
+    val mapView = remember {
+        MapView(context).apply {
+            setTileSource(EsriWorldStreetMapTileSource)
+            setMultiTouchControls(true)
+            zoomController.setVisibility(CustomZoomButtonsController.Visibility.NEVER)
+            controller.setZoom(15.0)
+            val fallbackPos = userLocation ?: startPoint ?: GeoPoint(19.432608, -99.133209)
+            controller.setCenter(fallbackPos)
         }
     }
+
+    DisposableEffect(mapView) {
+        mapView.onResume()
+        onDispose {
+            mapView.onPause()
+            mapView.onDetach()
+        }
+    }
+
+    // Actualizar overlays y renderizado del mapa
+    LaunchedEffect(
+        startPoint,
+        endPoint,
+        routePoints,
+        userLocation,
+        polylineColor,
+        hasLocationPermission
+    ) {
+        mapView.overlays.clear()
+
+        // 1. Overlay de eventos táctiles para clic en mapa
+        val eventsOverlay = MapEventsOverlay(object : MapEventsReceiver {
+            override fun singleTapConfirmedHelper(p: GeoPoint?): Boolean {
+                if (p != null) {
+                    onMapClick?.invoke(p)
+                    return true
+                }
+                return false
+            }
+
+            override fun longPressHelper(p: GeoPoint?): Boolean = false
+        })
+        mapView.overlays.add(eventsOverlay)
+
+        // 2. Capa de ubicación en tiempo real del usuario
+        if (hasLocationPermission) {
+            val myLocationOverlay = MyLocationNewOverlay(GpsMyLocationProvider(context), mapView).apply {
+                enableMyLocation()
+            }
+            mapView.overlays.add(myLocationOverlay)
+        }
+
+        // 3. Trazado de ruta con Polyline
+        if (routePoints.isNotEmpty()) {
+            val polyline = Polyline(mapView).apply {
+                setPoints(routePoints)
+                outlinePaint.color = polylineColor.toArgb()
+                outlinePaint.strokeWidth = 14f
+                outlinePaint.strokeCap = Paint.Cap.ROUND
+                outlinePaint.strokeJoin = Paint.Join.ROUND
+            }
+            mapView.overlays.add(polyline)
+        } else if (startPoint != null && endPoint != null) {
+            val directLine = Polyline(mapView).apply {
+                setPoints(listOf(startPoint, endPoint))
+                outlinePaint.color = polylineColor.copy(alpha = 0.8f).toArgb()
+                outlinePaint.strokeWidth = 10f
+                outlinePaint.strokeCap = Paint.Cap.ROUND
+            }
+            mapView.overlays.add(directLine)
+        }
+
+        // 4. Marcador de Inicio
+        if (startPoint != null) {
+            val startMarker = Marker(mapView).apply {
+                position = startPoint
+                title = startLabel
+                snippet = "Punto de partida"
+                isDraggable = isStartDraggable
+                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                if (isStartDraggable) {
+                    setOnMarkerDragListener(object : Marker.OnMarkerDragListener {
+                        override fun onMarkerDrag(marker: Marker?) {}
+                        override fun onMarkerDragStart(marker: Marker?) {}
+                        override fun onMarkerDragEnd(marker: Marker?) {
+                            marker?.position?.let { onStartDragEnd?.invoke(it) }
+                        }
+                    })
+                }
+            }
+            mapView.overlays.add(startMarker)
+        }
+
+        // 5. Marcador de Fin
+        if (endPoint != null) {
+            val endMarker = Marker(mapView).apply {
+                position = endPoint
+                title = endLabel
+                snippet = "Punto de destino"
+                isDraggable = isEndDraggable
+                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                if (isEndDraggable) {
+                    setOnMarkerDragListener(object : Marker.OnMarkerDragListener {
+                        override fun onMarkerDrag(marker: Marker?) {}
+                        override fun onMarkerDragStart(marker: Marker?) {}
+                        override fun onMarkerDragEnd(marker: Marker?) {
+                            marker?.position?.let { onEndDragEnd?.invoke(it) }
+                        }
+                    })
+                }
+            }
+            mapView.overlays.add(endMarker)
+        }
+
+        // 6. Centrado automático de la cámara y límites (BoundingBox)
+        try {
+            if (routePoints.size >= 2) {
+                val minLat = routePoints.minOf { it.latitude }
+                val maxLat = routePoints.maxOf { it.latitude }
+                val minLon = routePoints.minOf { it.longitude }
+                val maxLon = routePoints.maxOf { it.longitude }
+                val box = BoundingBox(maxLat + 0.005, maxLon + 0.005, minLat - 0.005, minLon - 0.005)
+                mapView.zoomToBoundingBox(box, true, 120)
+            } else if (startPoint != null && endPoint != null && startPoint != endPoint) {
+                val minLat = minOf(startPoint.latitude, endPoint.latitude)
+                val maxLat = maxOf(startPoint.latitude, endPoint.latitude)
+                val minLon = minOf(startPoint.longitude, endPoint.longitude)
+                val maxLon = maxOf(startPoint.longitude, endPoint.longitude)
+                val box = BoundingBox(maxLat + 0.006, maxLon + 0.006, minLat - 0.006, minLon - 0.006)
+                mapView.zoomToBoundingBox(box, true, 120)
+            } else if (startPoint != null) {
+                mapView.controller.animateTo(startPoint)
+                mapView.controller.setZoom(16.0)
+            } else if (userLocation != null) {
+                mapView.controller.animateTo(userLocation)
+                mapView.controller.setZoom(16.0)
+            }
+        } catch (_: Exception) {
+            val center = startPoint ?: userLocation ?: GeoPoint(19.432608, -99.133209)
+            mapView.controller.setCenter(center)
+        }
+
+        mapView.invalidate()
+    }
+
+    AndroidView(
+        factory = { mapView },
+        modifier = modifier
+    )
 }
 
 /** Cambia el color de los iconos de la barra de estado según el fondo de la pantalla. */
@@ -231,7 +378,6 @@ fun trafficColor(level: TrafficLevel): Color = when (level) {
 fun formatDuration(minutes: Int): String =
     if (minutes >= 60) "${minutes / 60} h ${minutes % 60} min" else "$minutes min"
 
-/** Mapa estilizado dibujado con Canvas (sin necesidad de API key). */
 @Composable
 fun MapCanvas(
     modifier: Modifier = Modifier,
