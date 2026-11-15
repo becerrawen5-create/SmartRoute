@@ -19,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -56,6 +57,16 @@ fun SmartRouteApp(vm: SmartRouteViewModel = viewModel()) {
         BottomTab(Dest.PROFILE, "Perfil", Icons.Filled.Person)
     )
 
+    fun navigateToTab(route: String) {
+        nav.navigate(route) {
+            popUpTo(nav.graph.findStartDestination().id) {
+                saveState = true
+            }
+            launchSingleTop = true
+            restoreState = true
+        }
+    }
+
     Scaffold(
         containerColor = Color.White,
         contentWindowInsets = WindowInsets.navigationBars,
@@ -65,13 +76,7 @@ fun SmartRouteApp(vm: SmartRouteViewModel = viewModel()) {
                     tabs.forEach { tab ->
                         NavigationBarItem(
                             selected = current == tab.route,
-                            onClick = {
-                                nav.navigate(tab.route) {
-                                    popUpTo(Dest.HOME) { saveState = true }
-                                    launchSingleTop = true
-                                    restoreState = true
-                                }
-                            },
+                            onClick = { navigateToTab(tab.route) },
                             icon = { Icon(tab.icon, contentDescription = tab.label) },
                             label = { Text(tab.label) }
                         )
@@ -90,7 +95,7 @@ fun SmartRouteApp(vm: SmartRouteViewModel = viewModel()) {
                     vm = vm,
                     onNavigateToHome = {
                         nav.navigate(Dest.HOME) {
-                            popUpTo(Dest.SPLASH) { inclusive = true }
+                            popUpTo(0) { inclusive = true }
                         }
                     },
                     onNavigateToLogin = {
@@ -105,7 +110,7 @@ fun SmartRouteApp(vm: SmartRouteViewModel = viewModel()) {
                     vm = vm,
                     onLoggedIn = {
                         nav.navigate(Dest.HOME) {
-                            popUpTo(Dest.LOGIN) { inclusive = true }
+                            popUpTo(0) { inclusive = true }
                         }
                     },
                     onNavigateToRegister = {
@@ -132,12 +137,13 @@ fun SmartRouteApp(vm: SmartRouteViewModel = viewModel()) {
                     onOpenMap = { nav.navigate(Dest.MAP) },
                     onOpenWeather = { nav.navigate(Dest.WEATHER) },
                     onOpenTraffic = { nav.navigate(Dest.TRAFFIC) },
-                    onOpenFavorites = { nav.navigate(Dest.FAVORITES) },
+                    onOpenFavorites = { navigateToTab(Dest.FAVORITES) },
                     onOpenRoute = { id ->
                         vm.select(id)
                         nav.navigate(Dest.DETAIL)
                     },
-                    onOpenProfile = { nav.navigate(Dest.PROFILE) }
+                    onOpenProfile = { navigateToTab(Dest.PROFILE) },
+                    onOpenHistory = { navigateToTab(Dest.HISTORY) }
                 )
             }
             composable(Dest.MAP) {
@@ -170,7 +176,7 @@ fun SmartRouteApp(vm: SmartRouteViewModel = viewModel()) {
             composable(Dest.TRAFFIC) { TrafficScreen(vm, onBack = { nav.popBackStack() }) }
             composable(Dest.PROFILE) {
                 ProfileScreen(vm=vm, onLogout = {
-                    nav.navigate("login") { popUpTo(0) { inclusive = true } }
+                    nav.navigate(Dest.LOGIN) { popUpTo(0) { inclusive = true } }
                 })
             }
         }
