@@ -20,9 +20,6 @@ import com.example.smartroute.data.*
 import com.example.smartroute.network.DirectionsApiClient
 import com.example.smartroute.network.LocationHelper
 import com.example.smartroute.network.WeatherApiClient
-import com.google.android.gms.auth.api.signin.GoogleSignIn
-import com.google.android.gms.auth.api.signin.GoogleSignInClient
-import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
@@ -402,19 +399,6 @@ class SmartRouteViewModel : ViewModel() {
             .addOnFailureListener { e ->
                 onResult(false, e.localizedMessage ?: "Error al registrar usuario en Firebase")
             }
-    }
-
-    fun getGoogleSignInClient(activity: Activity): GoogleSignInClient {
-        val serverClientId = try {
-            activity.getString(R.string.default_web_client_id)
-        } catch (_: Exception) {
-            "927563966222-3ph7vlbe8npfugkuj0kqskr3adrkpm1b.apps.googleusercontent.com"
-        }
-        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-            .requestIdToken(serverClientId)
-            .requestEmail()
-            .build()
-        return GoogleSignIn.getClient(activity, gso)
     }
 
     suspend fun signInWithGoogleCredential(activity: Activity): Result<String> {
