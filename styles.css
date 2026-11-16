@@ -1,0 +1,753 @@
+/* ==========================================================================
+   SmartRoute AI — Hoja de Estilos Oficial (Diseño Desktop y Móvil de Alta Fidelidad)
+   Fidelidad de Sistema de Diseño extraído de Theme.kt, Common.kt y colors.xml
+   ========================================================================== */
+
+:root {
+  /* Paleta cromática oficial de SmartRoute AI */
+  --blue-900: #071B4D;          /* ic_launcher_background & Hero Gradient Dark */
+  --blue-800: #0A2E80;          /* Hero Gradient Mid */
+  --blue-600: #0B57D0;          /* Primary Material 3 Color */
+  --blue-100: #E3ECFB;          /* SurfaceVariant / Tintes sutiles */
+  --yellow: #FFC928;            /* Secondary & Brand Highlight (SmartRoute AI) */
+  --ink: #16233F;               /* onSurface / Texto principal */
+  --muted: #6B7690;             /* onSurfaceVariant / Texto secundario */
+  --app-bg: #F4F7FD;            /* App Background */
+  --surface: #FFFFFF;           /* Card & Surface */
+  --outline-variant: #DDE4F3;   /* Bordes y divisores */
+  
+  /* Colores de estado */
+  --success: #2E9E5B;
+  --warning: #F59E0B;
+  --danger: #E5484D;
+
+  /* Formas y redondeo de Jetpack Compose */
+  --radius-card: 18px;          /* AppCard (18.dp) */
+  --radius-pill: 9999px;        /* RoundedCornerShape(50) */
+  --radius-box: 16px;           /* Contenedores de iconos (16.dp) */
+  --radius-step: 14px;          /* Tarjetas de pasos */
+
+  /* Elevaciones de sombra (dp a box-shadow) */
+  --shadow-card: 0 4px 20px rgba(7, 27, 77, 0.07);
+  --shadow-card-hover: 0 10px 30px rgba(7, 27, 77, 0.12);
+  --shadow-btn: 0 6px 20px rgba(11, 87, 208, 0.35);
+  --shadow-btn-hover: 0 10px 28px rgba(11, 87, 208, 0.48);
+  --shadow-snackbar: 0 10px 32px rgba(7, 27, 77, 0.28);
+
+  /* Transiciones */
+  --transition-fast: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-smooth: 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Reseteo global */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html {
+  font-size: 16px;
+  background-color: var(--blue-900);
+}
+
+body {
+  font-family: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  color: var(--ink);
+  background-color: var(--app-bg);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ==========================================================================
+   Barra de Navegación Superior
+   ========================================================================== */
+.top-nav {
+  background-color: var(--blue-900);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 14px 24px;
+}
+
+.nav-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.brand-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.brand-logo-small {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: rgba(255, 201, 40, 0.16);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.brand-header-text {
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+  color: #FFFFFF;
+}
+
+.brand-accent {
+  color: var(--yellow);
+}
+
+.nav-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #FFFFFF;
+  padding: 6px 14px;
+  border-radius: var(--radius-pill);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--success);
+}
+
+/* ==========================================================================
+   Hero Section (Degradado Oficial y Adaptativo)
+   ========================================================================== */
+.hero-section {
+  background: linear-gradient(135deg, var(--blue-900) 0%, var(--blue-800) 50%, var(--blue-600) 100%);
+  color: #FFFFFF;
+  padding: 48px 24px 64px 24px;
+  box-shadow: 0 6px 20px rgba(7, 27, 77, 0.15);
+}
+
+.hero-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 40px;
+  align-items: center;
+}
+
+.hero-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.hero-app-identity {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 20px;
+}
+
+.app-icon-wrapper {
+  position: relative;
+  width: 80px;
+  height: 80px;
+  flex-shrink: 0;
+  filter: drop-shadow(0 8px 18px rgba(7, 27, 77, 0.28));
+}
+
+.app-icon {
+  width: 100%;
+  height: 100%;
+  border-radius: 22px;
+  display: block;
+}
+
+.verified-badge {
+  position: absolute;
+  bottom: -4px;
+  right: -4px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--success);
+  border: 2px solid var(--blue-900);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.app-title-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.hero-title {
+  font-size: 2rem;
+  font-weight: 800;
+  letter-spacing: -0.4px;
+  line-height: 1.1;
+}
+
+.hero-tagline {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--yellow);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  margin-top: 4px;
+}
+
+.hero-headline {
+  font-size: 2.4rem;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  line-height: 1.15;
+  margin-bottom: 14px;
+}
+
+.hero-description {
+  font-size: 1.05rem;
+  color: rgba(255, 255, 255, 0.9);
+  line-height: 1.6;
+  max-width: 680px;
+  margin-bottom: 24px;
+}
+
+/* Insignias de metadatos */
+.metadata-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 28px;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: var(--radius-pill);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.pill-light {
+  background: rgba(255, 255, 255, 0.16);
+  color: #FFFFFF;
+  backdrop-filter: blur(8px);
+}
+
+.pill-accent {
+  background: var(--yellow);
+  color: var(--blue-900);
+  font-weight: 700;
+}
+
+/* Acciones principales de descarga */
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 32px;
+  background-color: var(--yellow);
+  color: var(--blue-900);
+  text-decoration: none;
+  border-radius: var(--radius-pill);
+  font-weight: 700;
+  box-shadow: 0 6px 20px rgba(255, 201, 40, 0.4);
+  transition: all var(--transition-fast);
+  cursor: pointer;
+  border: none;
+}
+
+.btn-primary:hover {
+  background-color: #FFD452;
+  transform: translateY(-2px);
+  box-shadow: 0 10px 28px rgba(255, 201, 40, 0.55);
+}
+
+.btn-primary:active {
+  transform: translateY(1px);
+}
+
+.btn-icon {
+  display: flex;
+  align-items: center;
+  animation: bounceSlow 2.5s infinite;
+}
+
+@keyframes bounceSlow {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(2px); }
+}
+
+.btn-text {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+}
+
+.btn-main-label {
+  font-size: 1.15rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.btn-sub-label {
+  font-size: 0.76rem;
+  font-weight: 500;
+  opacity: 0.9;
+}
+
+.security-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.82rem;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+/* Tarjeta QR Hero (Exclusiva para Computadoras / Desktop) */
+.hero-qr-box {
+  display: none; /* Oculto por defecto en celulares y tablets */
+}
+
+.qr-container-card {
+  background: var(--surface);
+  color: var(--ink);
+  border-radius: 24px;
+  padding: 28px 24px;
+  text-align: center;
+  max-width: 320px;
+  width: 100%;
+  box-shadow: 0 12px 36px rgba(7, 27, 77, 0.22);
+  border: 1px solid rgba(221, 228, 243, 0.8);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.qr-tag {
+  background-color: var(--blue-100);
+  color: var(--blue-600);
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  padding: 4px 12px;
+  border-radius: var(--radius-pill);
+  margin-bottom: 16px;
+}
+
+.qr-image-wrapper {
+  background: #FFFFFF;
+  padding: 10px;
+  border-radius: 16px;
+  border: 1px solid var(--outline-variant);
+  box-shadow: 0 4px 12px rgba(7, 27, 77, 0.06);
+  margin-bottom: 16px;
+}
+
+.qr-code-img {
+  display: block;
+  width: 170px;
+  height: 170px;
+}
+
+.qr-headline {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--ink);
+  margin-bottom: 6px;
+}
+
+.qr-subtext {
+  font-size: 0.82rem;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+/* ==========================================================================
+   Cuerpo Principal (Contenedor de Ancho Completo 1200px)
+   ========================================================================== */
+.main-body {
+  flex-grow: 1;
+  padding: 48px 24px 60px 24px;
+}
+
+.body-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 48px;
+}
+
+.section-block {
+  width: 100%;
+}
+
+.section-title {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: var(--ink);
+  letter-spacing: -0.3px;
+  margin-bottom: 6px;
+}
+
+.section-subtitle {
+  font-size: 0.95rem;
+  color: var(--muted);
+  margin-bottom: 24px;
+}
+
+/* ==========================================================================
+   Módulos de la Aplicación (Grid de 4 Columnas en Desktop)
+   ========================================================================== */
+.features-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+}
+
+.feature-card {
+  background: var(--surface);
+  border-radius: var(--radius-card);
+  padding: 24px 20px;
+  border: 1px solid rgba(221, 228, 243, 0.8);
+  box-shadow: var(--shadow-card);
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  transition: all var(--transition-fast);
+}
+
+.feature-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-card-hover);
+  border-color: rgba(11, 87, 208, 0.3);
+}
+
+.feature-icon-box {
+  width: 52px;
+  height: 52px;
+  border-radius: var(--radius-box);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.box-blue { background-color: var(--blue-100); }
+.box-sky  { background-color: #DDF0FB; }
+.box-red  { background-color: #FDE4E4; }
+.box-gold { background-color: #FFF1CC; }
+
+.feature-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.feature-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--ink);
+  margin-bottom: 4px;
+}
+
+.feature-desc {
+  font-size: 0.88rem;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+/* ==========================================================================
+   Tarjeta de Instalación (Grid de 3 Pasos)
+   ========================================================================== */
+.installation-card {
+  background: var(--surface);
+  border-radius: var(--radius-card);
+  padding: 36px 32px;
+  border: 1px solid rgba(221, 228, 243, 0.8);
+  box-shadow: var(--shadow-card);
+}
+
+.installation-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+.header-icon-pill {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--blue-100);
+  color: var(--blue-600);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.card-section-title {
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: var(--ink);
+  letter-spacing: -0.2px;
+}
+
+.card-section-desc {
+  font-size: 0.9rem;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.steps-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+}
+
+.step-card {
+  background: var(--app-bg);
+  border-radius: var(--radius-step);
+  padding: 24px 20px;
+  border: 1px solid rgba(221, 228, 243, 0.6);
+  display: flex;
+  flex-direction: column;
+  transition: transform var(--transition-fast);
+}
+
+.step-card:hover {
+  transform: translateY(-2px);
+}
+
+.step-badge {
+  display: inline-block;
+  align-self: flex-start;
+  background: var(--blue-600);
+  color: #FFFFFF;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  margin-bottom: 12px;
+}
+
+.step-card-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--ink);
+  margin-bottom: 6px;
+}
+
+.step-card-desc {
+  font-size: 0.88rem;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.step-card-desc strong {
+  color: var(--ink);
+}
+
+.step-card-desc em {
+  font-style: normal;
+  color: var(--blue-600);
+  font-weight: 600;
+}
+
+/* ==========================================================================
+   Footer
+   ========================================================================== */
+.footer {
+  background-color: var(--surface);
+  border-top: 1px solid var(--outline-variant);
+  padding: 28px 24px;
+}
+
+.footer-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+  text-align: center;
+}
+
+.footer-brand {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.footer-logo {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--blue-900);
+}
+
+.footer-copy {
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.footer-tech {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+/* ==========================================================================
+   Snackbar Estilo Android Material 3
+   ========================================================================== */
+.android-snackbar {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(140%);
+  width: calc(100% - 32px);
+  max-width: 460px;
+  background-color: var(--ink);
+  color: #FFFFFF;
+  border-radius: 14px;
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  box-shadow: var(--shadow-snackbar);
+  z-index: 9999;
+  opacity: 0;
+  visibility: hidden;
+  transition: transform var(--transition-smooth), opacity var(--transition-smooth), visibility var(--transition-smooth);
+}
+
+.android-snackbar.show {
+  transform: translateX(-50%) translateY(0);
+  opacity: 1;
+  visibility: visible;
+}
+
+.snackbar-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  overflow: hidden;
+}
+
+.snackbar-icon {
+  flex-shrink: 0;
+}
+
+.snackbar-message {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.snackbar-title {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #FFFFFF;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.snackbar-desc {
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.snackbar-action {
+  background: none;
+  border: none;
+  color: var(--yellow);
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  cursor: pointer;
+  padding: 6px 12px;
+  border-radius: 6px;
+  transition: background-color var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.snackbar-action:hover {
+  background-color: rgba(255, 201, 40, 0.15);
+}
+
+/* ==========================================================================
+   Breakpoints para Computadora y Tablets (Aprovechamiento Total del Espacio)
+   ========================================================================== */
+
+/* Tablets (768px en adelante) */
+@media (min-width: 768px) {
+  .features-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .steps-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .footer-container {
+    flex-direction: row;
+    justify-content: space-between;
+    text-align: left;
+  }
+}
+
+/* Computadoras / Desktop (960px en adelante) */
+@media (min-width: 960px) {
+  .hero-qr-box {
+    display: flex; /* Se muestra exclusivamente en monitores y laptops de escritorio */
+    justify-content: center;
+  }
+
+  .hero-section {
+    padding: 64px 32px 80px 32px;
+  }
+
+  .hero-container {
+    grid-template-columns: 1.35fr 0.65fr;
+    gap: 56px;
+  }
+
+  .hero-headline {
+    font-size: 3rem;
+  }
+
+  .features-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 24px;
+  }
+
+  .installation-card {
+    padding: 44px 40px;
+  }
+}
